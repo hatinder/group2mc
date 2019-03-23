@@ -3,4 +3,4 @@ project(ProjectA)
 
 set(CMAKE_CXX_STANDARD 11)
 
-add_executable(ProjectA main.cpp Class1.cpp Class1.hpp)
+add_executable(ProjectA main.cpp Class1.cpp Class1.hpp test2.cpp test2.hpp)
