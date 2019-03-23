@@ -4,7 +4,10 @@
 
 #include <iostream>
 #include "BlackScholes.hpp"
+// Fix stats.hpp , download using command git clone -b master --single-branch https://github.com/kthohr/stats ./stats
+// Download to folder : ../ i.e. one folder above using above given command.
 #include "stats.hpp"
+// Download this file to following folder :
 
 using namespace stats;
 using namespace std;
