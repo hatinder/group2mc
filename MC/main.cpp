@@ -32,7 +32,7 @@ void runEuler()
 {
     unique_ptr<Euler> mc;
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
-    int size=50000;
+    int size=100;
     double t = 0.0;
 
     vector<double> Sj(size,0.0),Vj(size,0.0),SjMinusDT(size,0.0),SjPlusDT(size,0.0);
@@ -58,7 +58,7 @@ void runMonteCarloSimulation()
 {
     unique_ptr<MonteCarlo> mc;
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
-    int size=5000;
+    int size=100;
     double dt=1.0/365.0;
     double t=0.0;
     vector<double> Sj(size,0.0),Vj(size,0.0),SjMinusDT(size,0.0),SjPlusDT(size,0.0);
