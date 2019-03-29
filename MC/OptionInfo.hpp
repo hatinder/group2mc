@@ -15,7 +15,7 @@ using namespace std;
 class OptionInfo
 {
 private:
-    double S0, K, T, r, sigma;
+    double S0, K, T, r, sigma, dy;
 public:
     double getS0 () const;
 
@@ -27,8 +27,9 @@ public:
 
     double getSigma () const;
 
+    double getDY() const;
 public:
-    OptionInfo (double S0, double K, double T, double r, double sigma);
+    OptionInfo (double S0, double K, double T, double r, double sigma, double dy);
     OptionInfo();
     double payOff(double ST)
     {
