@@ -11,7 +11,7 @@ class BlackScholes
 {
 public:
     vector<double> calcExactValues (double S0, double K, double r, double sigma, double T);\
-
+    vector<double> calcAssetOrNothingExactValues (double S0, double K, double r, double sigma, double T);\
     double calcExactDelta();
 };
 
