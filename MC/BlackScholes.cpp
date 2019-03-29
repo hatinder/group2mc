@@ -25,14 +25,5 @@ vector<double> BlackScholes::calcExactValues (double S0, double K, double r, dou
     return values;
 }
 
-vector<double> BlackScholes::calcAssetOrNothingExactValues (double S0, double K, double r, double sigma, double T)
-{
-    vector<double> values(2,0.0);
-    double d1=(log(S0/K) + (r+(sigma*sigma)/2) * T)/(sigma*sqrt(T));
-    double Nd1=pnorm(d1,0.0,1.0);
-    values[0]=S0*Nd1;
-//    cout<<"d1: "<<d1<<",  Nd1:"<<Nd1<<<<endl;
-    values[1]=Nd1 + exp(((-1)*d1*d1)/2)/(sigma*sqrt(2*M_PI*T));
-    return values;
-}
+
 

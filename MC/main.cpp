@@ -20,7 +20,7 @@ int main ()
     runMonteCarloSimulation();
     runEuler();
     runBlackScholes();
-    runAssetOrNothing();
+
     return 0;
 }
 
@@ -106,14 +106,3 @@ void runBlackScholes()
 
 }
 
-void runAssetOrNothing()
-{
-    unique_ptr<BlackScholes> bs;
-    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
-    vector<double> values= bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
-                                               optionInfo->getT());
-    vector<double> AssetOrNothingValues= bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
-                                                                           optionInfo->getT());
-    cout<<"Asset-or-nothing Call Price: "<<AssetOrNothingValues[0]<<endl;
-    cout<<"Asset-or-nothing Delta: "<<AssetOrNothingValues[1]<<endl;
-}
