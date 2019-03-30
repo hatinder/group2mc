@@ -28,6 +28,9 @@ void initOptionInfo()
 {
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
     cout<<  optionInfo<<endl;
+//    shared_ptr<OptionInfo> optionInfo2=make_shared<OptionInfo>(70.0, 65.0, 0.5, 0.07, 0.27, 0.05);
+//    cout<<  optionInfo2<<endl;
+
 }
 
 void runEuler()
