@@ -16,9 +16,12 @@ vector<double> RNG::rngUsingBM (int size)
         double r=distribution(gen);
         double phi=distribution(gen);
         rng[i]=sqrt(-2*log(r))*cos(2*M_PI*phi);
-        rng[1+1]=sqrt(-2*log(r))*sin(2*M_PI*phi);
+        rng[i+1]=sqrt(-2*log(r))*sin(2*M_PI*phi);
 
     }
+//    for (int j = 0; j < rng.size(); ++j) {
+//        cout<<rng[j]<<endl;
+//    }
     return rng;
 }
 
