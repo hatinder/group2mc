@@ -23,8 +23,8 @@ int main ()
     runEuler();
     runBlackScholes();
     cout<<endl;
-    runEulerAssetOrNothing();
     runMonteCarloSimulationForAssetOrNothing();
+    runEulerAssetOrNothing();
     runAssetOrNothing();
     return 0;
 }
@@ -145,6 +145,7 @@ void runMonteCarloSimulationForAssetOrNothing()
     {
         //        cout<<Sj[j]<<endl;
         Vj[j]=optionInfo->payOffForAssetOrNothing(Sj[j]);
+        //      cout<<Vj[j]<<endl;
     }
 
     double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
