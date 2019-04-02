@@ -15,7 +15,7 @@ using namespace std;
 class OptionInfo
 {
 private:
-    double S0, K, T, r, sigma, dy;
+    double S0, K, T, r, sigma;
 public:
     double getS0 () const;
 
@@ -27,13 +27,24 @@ public:
 
     double getSigma () const;
 
-    double getDY() const;
 public:
-    OptionInfo (double S0, double K, double T, double r, double sigma, double dy);
+    OptionInfo (double S0, double K, double T, double r, double sigma);
     OptionInfo();
     double payOff(double ST)
     {
         return max(ST-K,0.0);
+    }
+
+    double payOffForAssetOrNothing(double ST)
+    {
+        if(ST>K)
+        {
+            return ST;
+        }
+        else
+        {
+            return 0;
+        }
     }
 
 //    friend ostream& operator<< (ostream &out, const OptionInfo &oi);

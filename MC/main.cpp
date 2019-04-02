@@ -12,6 +12,8 @@ void runMonteCarloSimulation();
 void runRNG();
 void runEuler();
 void runBlackScholes();
+void runEulerAssetOrNothing();
+void runMonteCarloSimulationForAssetOrNothing();
 void runAssetOrNothing();
 
 int main ()
@@ -20,6 +22,9 @@ int main ()
     runMonteCarloSimulation();
     runEuler();
     runBlackScholes();
+    cout<<endl;
+    runEulerAssetOrNothing();
+    runMonteCarloSimulationForAssetOrNothing();
     runAssetOrNothing();
     return 0;
 }
@@ -28,7 +33,7 @@ void initOptionInfo()
 {
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
     cout<<  optionInfo<<endl;
-//    shared_ptr<OptionInfo> optionInfo2=make_shared<OptionInfo>(70.0, 65.0, 0.5, 0.07, 0.27, 0.05);
+//    shared_ptr<OptionInfo> optionInfo2=make_shared<OptionInfo>(70.0, 65.0, 0.5, 0.07, 0.27);
 //    cout<<  optionInfo2<<endl;
 
 }
@@ -46,7 +51,6 @@ void runEuler()
     for (int j = 0; j < Sj.size(); ++j)
     {
         Vj[j]=optionInfo->payOff(Sj[j]);
-
     }
 
     double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
@@ -54,8 +58,6 @@ void runEuler()
 
     double avgVT = accumulate( Vj.begin(), Vj.end(), 0.0)/Vj.size();
     cout << "Euler Call Price: " << exp(-optionInfo->getR()*(optionInfo->getT()-t))*avgVT << endl;
-
-
 
 }
 
@@ -109,12 +111,55 @@ void runBlackScholes()
 
 }
 
+void runEulerAssetOrNothing()
+{
+    unique_ptr<Euler> mc;
+    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
+    int size=100;
+    double t = 0.0;
+
+    vector<double> Sj(size,0.0),Vj(size,0.0);
+    Sj = mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),size);
+    for (int j = 0; j < Sj.size(); ++j)
+    {
+        Vj[j]=optionInfo->payOffForAssetOrNothing(Sj[j]);
+    }
+
+    double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+    cout << "Approximate Stock Price at T : " << avgST << endl;
+
+    double avgVT = accumulate( Vj.begin(), Vj.end(), 0.0)/Vj.size();
+    cout << "Euler Asset-or-nothing Call Price: " << exp(-optionInfo->getR()*(optionInfo->getT()-t))*avgVT << endl;
+}
+
+void runMonteCarloSimulationForAssetOrNothing()
+{
+    unique_ptr<MonteCarlo> mc;
+    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
+    int size=100;
+    double dt=1.0/365.0;
+    double t=0.0;
+    vector<double> Sj(size,0.0),Vj(size,0.0);
+    Sj= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),size);
+    for (int j = 0; j < Sj.size(); ++j)
+    {
+        //        cout<<Sj[j]<<endl;
+        Vj[j]=optionInfo->payOffForAssetOrNothing(Sj[j]);
+    }
+
+    double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+    cout << "Approximate Stock Price at T : " << avgST << endl;
+
+    double avgVT = accumulate( Vj.begin(), Vj.end(), 0.0)/Vj.size();
+    cout << "MC Asset-or-nothing Call Price: " << exp(-optionInfo->getR()*(optionInfo->getT()-t))*avgVT << endl;
+}
+
 void runAssetOrNothing()
 {
     unique_ptr<BlackScholes> bs;
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
     vector<double> AssetOrNothingValues= bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
-                                                                           optionInfo->getT(),optionInfo->getDY());
+                                                                           optionInfo->getT());
     cout<<"Asset-or-nothing Call Price: "<<AssetOrNothingValues[0]<<endl;
     cout<<"Asset-or-nothing Delta: "<<AssetOrNothingValues[1]<<endl;
 }
