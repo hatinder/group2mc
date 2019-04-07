@@ -2,7 +2,14 @@
 // Created by hsingh9 on 23/03/2019.
 //
 
+#include <iomanip>
+#include <fstream>
+#include <cassert>
+#include <sstream>
 #include "RNG.hpp"
+#include "stats.hpp"
+
+using namespace stats;
 
 //Box-Muller Method
 vector<double> RNG::rngUsingBM (int size)
@@ -55,4 +62,39 @@ vector<double> RNG::rngUsingMTE (int size)
         rng[i]=distribution(gen);
     }
     return rng;
+}
+
+unique_ptr<double[]> RNG::rngUsingStatsBM (int size)
+{
+    unique_ptr<double[]> bm{new double[2]()};
+//    random_device rd;
+    mt19937 gen(rand());
+    uniform_real_distribution<> distribution(0.0,1.0);
+//    double val=runif(0.0,1.0);
+    double val=distribution(gen);
+    bm[0]=sqrt(-2*log(val))*cos(2*M_PI*val);
+    bm[1]=sqrt(-2*log(val))*sin(2*M_PI*val);
+    cout<<bm[0]<<endl;
+//    cout<<bm[1]<<endl;
+    return bm;
+}
+
+void RNG::writeToFile (const string fNamePrefix, unique_ptr<double[]> v, const int size, const int k, string colName)
+{
+    ostringstream iterate_label;
+    iterate_label.width(3);
+    iterate_label.fill('0');
+    iterate_label << k;
+    string file_name = fNamePrefix + iterate_label.str() + ".txt";
+    ofstream oFileStream;
+    oFileStream.open(file_name.c_str());
+    assert(oFileStream.is_open());
+    oFileStream<<setw(12)<<colName;
+    oFileStream<<endl;
+    for (int i = 0; i < size; ++i)
+    {
+        oFileStream<<v[i]<<endl;
+    }
+    oFileStream.close();
+
 }

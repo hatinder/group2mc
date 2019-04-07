@@ -15,6 +15,10 @@ void runBlackScholes();
 void runEulerAssetOrNothing();
 void runMonteCarloSimulationForAssetOrNothing();
 void runAssetOrNothing();
+void runRNGUsingStatsBM();
+void runWeakEulerStockPrice();
+void runWeakEulerMCCP();
+void runMCUsingStatsBM();
 
 int main ()
 {
@@ -26,6 +30,10 @@ int main ()
     runMonteCarloSimulationForAssetOrNothing();
     runEulerAssetOrNothing();
     runAssetOrNothing();
+//    runRNGUsingStatsBM();
+//    runWeakEulerStockPrice();
+//    runWeakEulerMCCP();
+//    runMCUsingStatsBM();
     return 0;
 }
 
@@ -40,14 +48,14 @@ void initOptionInfo()
 
 void runEuler()
 {
-    unique_ptr<Euler> mc;
+    unique_ptr<Euler> euler;
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
     int size=100;
     double t = 0.0;
 
     vector<double> Sj(size,0.0),Vj(size,0.0),SjMinusDT(size,0.0),SjPlusDT(size,0.0);
     vector<double> VjMinusDT(size,0.0),VjPlusDT(size,0.0);
-    Sj = mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),size);
+    Sj = euler->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),size);
     for (int j = 0; j < Sj.size(); ++j)
     {
         Vj[j]=optionInfo->payOff(Sj[j]);
@@ -68,6 +76,7 @@ void runMonteCarloSimulation()
     int size=100;
     double dt=1.0/365.0;
     double t=0.0;
+    double D=exp(-optionInfo->getR()*(optionInfo->getT()-t));
     vector<double> Sj(size,0.0),Vj(size,0.0),SjMinusDT(size,0.0),SjPlusDT(size,0.0);
     vector<double> VjMinusDT(size,0.0),VjPlusDT(size,0.0);
     Sj= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),size);
@@ -82,7 +91,7 @@ void runMonteCarloSimulation()
     cout << "Approximate Stock Price at T : " << avgST << endl;
 
     double avgVT = accumulate( Vj.begin(), Vj.end(), 0.0)/Vj.size();
-    cout << "MC Call Price: " << exp(-optionInfo->getR()*(optionInfo->getT()-t))*avgVT << endl;
+    cout << "MC Call Price: " << D*avgVT <<" , Discounting Factor:"<<D<< endl;
 
     //DELTA SIMULATION
     SjMinusDT= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT()-dt, optionInfo->getR(),optionInfo->getSigma(),size);
@@ -163,4 +172,84 @@ void runAssetOrNothing()
                                                                            optionInfo->getT());
     cout<<"Asset-or-nothing Call Price: "<<AssetOrNothingValues[0]<<endl;
     cout<<"Asset-or-nothing Delta: "<<AssetOrNothingValues[1]<<endl;
+}
+
+
+void runRNGUsingStatsBM()
+{
+
+    srand(time(0));
+    int size=10000;
+    unique_ptr<double[]> bm{new double[size]()};
+    unique_ptr<RNG> rng;
+    for (int i = 0; i < size; i=i+2)
+    {
+        bm[i]= rng->rngUsingStatsBM(0)[0];
+        bm[i+1]= rng->rngUsingStatsBM(0)[1];
+    }
+    rng->writeToFile("RNG",move(bm),size,1,"rng");
+}
+
+void runWeakEulerStockPrice()
+{
+
+    srand(time(0));
+    double dt=1.0/365.0;
+    int size=2;
+    unique_ptr<double[]> ST{new double[size]()};
+    unique_ptr<RNG> rng;
+    unique_ptr<Euler> euler;
+    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
+    for (int i = 0; i < size; i++)
+    {
+//        Option( S0: 70, K: 65, T: 0.5, r: 0.07, sigma: 0.27
+        ST[i]=euler->getStockPrice(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),dt);
+    }
+    rng->writeToFile("ST",move(ST),size,1,"ST");
+}
+
+void runWeakEulerMCCP()
+{
+
+    srand(time(0));
+    double dt=1.0/10.0;
+    double CP=0.0, ST;
+    int size=10000;
+    unique_ptr<double[]> cpVal{new double[size]()};
+    unique_ptr<Euler> euler;
+    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
+    double D=exp(-optionInfo->getR()*optionInfo->getT());
+    for (int i = 0; i < size; i++)
+    {
+//        Option( S0: 70, K: 65, T: 0.5, r: 0.07, sigma: 0.27
+        ST=euler->getStockPrice(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),dt);
+        //cout<<ST<<endl;
+        CP+=ST-optionInfo->getK();
+        cpVal[i]=D*(ST-optionInfo->getK());
+    }
+    CP=D*((double)1/size)*CP;
+    euler->writeToFile("CP",move(cpVal),size,1);
+    cout<<"Call Price : "<<CP<<" , Discount Factor: "<<D<<endl;
+}
+
+void runMCUsingStatsBM()
+{
+    srand(time(0));
+    unique_ptr<MonteCarlo> mc;
+    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
+    int size=100;
+    double dt=1.0/365.0;
+    unique_ptr<double[]> cpVal{new double[size]()};
+    double CP=0.0, ST;
+    double D=exp(-optionInfo->getR()*optionInfo->getT());
+    for (int i = 0; i < size; ++i)
+    {
+        ST= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,
+                               size);
+        CP+=optionInfo->payOff(ST);
+        cpVal[i]=D*(ST-optionInfo->getK());
+    }
+    CP=D*((double)1/size)*CP;
+    mc->writeToFile("MCCP",move(cpVal),size,1);
+    cout<<"Call Price : "<<CP<<" , Discount Factor: "<<D<<endl;
 }
