@@ -33,10 +33,11 @@ int main ()
 //    runMonteCarloSimulationForAssetOrNothing();
 //    runEulerAssetOrNothing();
 //    runAssetOrNothing();
-//    runRNGUsingStatsBM();
+    runRNGUsingStatsBM();
 //    runWeakEulerStockPrice();
-    runWeakEulerMCCP();
+//    runWeakEulerMCCP();
 //    runMCUsingStatsBM();
+//    runRNG();
     return 0;
 }
 
@@ -285,5 +286,23 @@ void runMCUsingStatsBM()
     cout<<"Total Time: "<< elapsed_secs<<" seconds"<<endl;
     cout<<"MC Call Price: "<<D*((double)1/size)*CPFinal<<endl;
     mc->writeToFile("MCCP",move(cpVal),size,1);
+
+}
+
+void runRNG()
+{
+    int size=10000;
+    unique_ptr<double[]> bm{new double[size]()};
+    vector<double> v;
+    unique_ptr<RNG> rng;
+    for (int i = 0; i < size; i=i+2)
+    {
+        v= rng->rngUsingBM(size);
+    }
+    for (int j = 0; j < v.size(); ++j)
+    {
+        bm[j]=v[j];
+    }
+    rng->writeToFile("RNG",move(bm),size,2,"rng");
 
 }
