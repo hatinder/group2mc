@@ -7,6 +7,9 @@
 #include "BlackScholes.hpp"
 #include <iomanip>
 
+
+random_device rdStats;
+
 void initOptionInfo();
 void runMonteCarloSimulation();
 void runRNG();
@@ -26,10 +29,10 @@ int main ()
     runMonteCarloSimulation();
     runEuler();
     runBlackScholes();
-    cout<<endl;
-    runMonteCarloSimulationForAssetOrNothing();
-    runEulerAssetOrNothing();
-    runAssetOrNothing();
+//    cout<<endl;
+//    runMonteCarloSimulationForAssetOrNothing();
+//    runEulerAssetOrNothing();
+//    runAssetOrNothing();
 //    runRNGUsingStatsBM();
 //    runWeakEulerStockPrice();
 //    runWeakEulerMCCP();
@@ -73,7 +76,7 @@ void runMonteCarloSimulation()
 {
     unique_ptr<MonteCarlo> mc;
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
-    int size=100;
+    int size=10000;
     double dt=1.0/365.0;
     double t=0.0;
     double D=exp(-optionInfo->getR()*(optionInfo->getT()-t));
@@ -190,6 +193,7 @@ void runRNGUsingStatsBM()
     rng->writeToFile("RNG",move(bm),size,1,"rng");
 }
 
+
 void runWeakEulerStockPrice()
 {
 
@@ -212,7 +216,7 @@ void runWeakEulerMCCP()
 {
 
     srand(time(0));
-    double dt=1.0/10.0;
+    double dt=1.0/(2*365.0);
     double CP=0.0, ST;
     int size=10000;
     unique_ptr<double[]> cpVal{new double[size]()};
@@ -224,17 +228,17 @@ void runWeakEulerMCCP()
 //        Option( S0: 70, K: 65, T: 0.5, r: 0.07, sigma: 0.27
         ST=euler->getStockPrice(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),dt);
         //cout<<ST<<endl;
-        CP+=ST-optionInfo->getK();
+        CP+=optionInfo->payOff(ST);
         cpVal[i]=D*(ST-optionInfo->getK());
     }
     CP=D*((double)1/size)*CP;
     euler->writeToFile("CP",move(cpVal),size,1);
-    cout<<"Call Price : "<<CP<<" , Discount Factor: "<<D<<endl;
+    cout<<"Weak Euler Call Price : "<<CP<<" , Discount Factor: "<<D<<endl;
 }
 
 void runMCUsingStatsBM()
 {
-    srand(time(0));
+
     unique_ptr<MonteCarlo> mc;
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
     int size=100;
@@ -242,14 +246,21 @@ void runMCUsingStatsBM()
     unique_ptr<double[]> cpVal{new double[size]()};
     double CP=0.0, ST;
     double D=exp(-optionInfo->getR()*optionInfo->getT());
-    for (int i = 0; i < size; ++i)
+    for (int j = 1; j < size; ++j)
     {
-        ST= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,
-                               size);
-        CP+=optionInfo->payOff(ST);
-        cpVal[i]=D*(ST-optionInfo->getK());
+        CP=0.0;
+        for (int i = 0; i < j; ++i)
+        {
+            ST= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,
+                                   size);
+            CP+=optionInfo->payOff(ST);
+
+        }
+        CP=D*((double)1/j)*CP;
+        cpVal[j]=CP;
+        cout<<"Monte Carlo Call Price : "<<CP<<" , size: "<<j<<endl;
     }
-    CP=D*((double)1/size)*CP;
+
     mc->writeToFile("MCCP",move(cpVal),size,1);
-    cout<<"Call Price : "<<CP<<" , Discount Factor: "<<D<<endl;
+
 }

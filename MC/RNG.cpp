@@ -9,6 +9,7 @@
 #include "RNG.hpp"
 #include "stats.hpp"
 
+extern random_device rdStats;
 using namespace stats;
 
 //Box-Muller Method
@@ -68,13 +69,15 @@ unique_ptr<double[]> RNG::rngUsingStatsBM (int size)
 {
     unique_ptr<double[]> bm{new double[2]()};
 //    random_device rd;
-    mt19937 gen(rand());
-    uniform_real_distribution<> distribution(0.0,1.0);
-//    double val=runif(0.0,1.0);
-    double val=distribution(gen);
-    bm[0]=sqrt(-2*log(val))*cos(2*M_PI*val);
-    bm[1]=sqrt(-2*log(val))*sin(2*M_PI*val);
-    cout<<bm[0]<<endl;
+//    mt19937 gen(rdStats());
+//    uniform_real_distribution<> distribution(0.0,1.0);
+    double r=runif(0.0,1.0,rand());
+    double phi=runif(0.0,1.0,rand());
+//    double r=distribution(gen);
+//    double phi=distribution(gen);
+    bm[0]=sqrt(-2*log(r))*cos(2*M_PI*phi);
+    bm[1]=sqrt(-2*log(r))*sin(2*M_PI*phi);
+//    cout<<bm[0]<<endl;
 //    cout<<bm[1]<<endl;
     return bm;
 }
