@@ -26,8 +26,8 @@ void runMCUsingStatsBM();
 int main ()
 {
     initOptionInfo();
-    runMonteCarloSimulation();
-    runEuler();
+//    runMonteCarloSimulation();
+//    runEuler();
     runBlackScholes();
 //    cout<<endl;
 //    runMonteCarloSimulationForAssetOrNothing();
@@ -35,7 +35,7 @@ int main ()
 //    runAssetOrNothing();
 //    runRNGUsingStatsBM();
 //    runWeakEulerStockPrice();
-//    runWeakEulerMCCP();
+    runWeakEulerMCCP();
 //    runMCUsingStatsBM();
     return 0;
 }
@@ -216,24 +216,48 @@ void runWeakEulerMCCP()
 {
 
     srand(time(0));
-    double dt=1.0/(2*365.0);
-    double CP=0.0, ST;
+    double dt=1.0/365.0;
+    double CP=0.0, ST,CPFinal=0.0,sigmahatsqr, sigmaCalc;
     int size=10000;
     unique_ptr<double[]> cpVal{new double[size]()};
+    unique_ptr<double[]> iVal{new double[size]()};
     unique_ptr<Euler> euler;
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
     double D=exp(-optionInfo->getR()*optionInfo->getT());
-    for (int i = 0; i < size; i++)
+    for (int i = 1; i <= size; i++)
     {
 //        Option( S0: 70, K: 65, T: 0.5, r: 0.07, sigma: 0.27
         ST=euler->getStockPrice(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),dt);
         //cout<<ST<<endl;
         CP+=optionInfo->payOff(ST);
-        cpVal[i]=D*(ST-optionInfo->getK());
+        iVal[i-1]=optionInfo->payOff(ST);
+        double tempCP=D*((double)1/i)*CP;
+        cpVal[i-1]=tempCP;
+
+        if(i%1000==0)
+        {
+            CPFinal=((double)1/i)*CP;
+            for (int j = 0; j < i; ++j)
+            {
+                sigmaCalc=(iVal[j]-CPFinal)*(iVal[j]-CPFinal);
+            }
+            sigmahatsqr=((double)1/i)*sigmaCalc;
+            double tempCP=D*((double)1/i)*CP;
+            cout<<"Weak Euler Call Price : "<<tempCP <<" , Simulation Size: "<< i<<endl;
+            cout<<"Confidence Interval : [ "<<D*(CPFinal-(1.96)*sqrt((double)sigmahatsqr/i))<<" , "<<D*(CPFinal+(1.96)*sqrt((double)sigmahatsqr/i))<<" ]" <<endl;
+        }
     }
+    CPFinal=((double)1/size)*CP;
+    for (int j = 0; j < size; ++j)
+    {
+        sigmaCalc=(iVal[j]-CPFinal)*(iVal[j]-CPFinal);
+    }
+    sigmahatsqr=((double)1/size)*sigmaCalc;
     CP=D*((double)1/size)*CP;
     euler->writeToFile("CP",move(cpVal),size,1);
-    cout<<"Weak Euler Call Price : "<<CP<<" , Discount Factor: "<<D<<endl;
+    cout<<"Weak Euler Call Price : "<<CP<<endl;
+//    cout<<"Sigma hat squared: "<<CPFinal-1.96*sqrt(sigmahatsqr/size)<<endl;
+    cout<<"Confidence Interval : [ "<<D*(CPFinal-(1.96)*sqrt((double)sigmahatsqr/size))<<" , "<<D*(CPFinal+(1.96)*sqrt((double)sigmahatsqr/size))<<" ]" <<endl;
 }
 
 void runMCUsingStatsBM()
@@ -241,26 +265,25 @@ void runMCUsingStatsBM()
 
     unique_ptr<MonteCarlo> mc;
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
-    int size=100;
+    int size=10000;
     double dt=1.0/365.0;
     unique_ptr<double[]> cpVal{new double[size]()};
-    double CP=0.0, ST;
+    double CP=0.0, CPFinal=0.0, ST;
     double D=exp(-optionInfo->getR()*optionInfo->getT());
-    for (int j = 1; j < size; ++j)
+    clock_t begin=clock();
+    for (int i = 1; i <= size; ++i)
     {
-        CP=0.0;
-        for (int i = 0; i < j; ++i)
-        {
-            ST= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,
-                                   size);
-            CP+=optionInfo->payOff(ST);
-
-        }
-        CP=D*((double)1/j)*CP;
-        cpVal[j]=CP;
-        cout<<"Monte Carlo Call Price : "<<CP<<" , size: "<<j<<endl;
+        ST= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,
+                               size);
+        CP+=optionInfo->payOff(ST);
+        CPFinal+=optionInfo->payOff(ST);
+        double tempCP=D*((double)1/i)*CP;
+        cpVal[i-1]=tempCP;
     }
-
+    clock_t end=clock();
+    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    cout<<"Total Time: "<< elapsed_secs<<" seconds"<<endl;
+    cout<<"MC Call Price: "<<D*((double)1/size)*CPFinal<<endl;
     mc->writeToFile("MCCP",move(cpVal),size,1);
 
 }

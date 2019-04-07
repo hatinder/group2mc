@@ -89,10 +89,9 @@ double MonteCarlo::genStockPrices (double S0, double T, double r, double sigma, 
     double b=sigma*sqrt(dt);
     unique_ptr<double[]> bmVal{new double[2]()};
     unique_ptr<RNG> rng;
-    int size=2*(round(T/dt)*simsize + 1);
     while(t<=T)
     {
-        bmVal= rng->rngUsingStatsBM(size);
+        bmVal= rng->rngUsingStatsBM(0);
         St=St*exp(a+b*bmVal[0]);
         St=St*exp(a+b*bmVal[1]);
         t=t+2*dt;
