@@ -54,35 +54,71 @@ double MonteCarlo::genStockPrice2 (double S0, double T, double r, double sigma, 
     return St;
 }
 
-vector<double> MonteCarlo::genStockPrices (double S0, double T, double r, double sigma,int simSize)
+//vector<double> MonteCarlo::genStockPrices3 (double S0, double T, double r, double sigma,int simSize)
+//{
+//    double dt=1.0/365.0,t;
+//    double St;
+//    double a=(r-(1.0/2.0) * sigma * sigma)*dt;
+//    double b=sigma*sqrt(dt);
+//    vector<double> AllST(simSize,0.0);
+//    shared_ptr<RNG> rng=make_shared<RNG>();
+////    vector<double> e= rng->rngUsingMTE(simSize*round(T/dt) + 1);
+//    vector<double> e= rng->rngUsingBM(simSize*round(T/dt) + 1);
+//    int i=0;
+//    for (int j = 0; j < simSize; ++j)
+//    {
+//        St=S0;
+//        t=0.0;
+//        do{
+//            do{
+//                St= St*exp( a + b*e[i] );
+//                t+=dt;
+//                i++;
+//            }while(t<T && i<e.size());
+//        }while(t<T);
+////        cout<<St<<endl;
+//        AllST[j]=St;
+//    }
+//    return AllST;
+//}
+
+vector<double> MonteCarlo::genStockPrices (double S0, double T, double r, double sigma, double dt, int simsize)
 {
-    double dt=1.0/365.0,t;
-    double St;
-    double a=(r-(1.0/2.0) * sigma * sigma)*dt;
-    double b=sigma*sqrt(dt);
-    vector<double> AllST(simSize,0.0);
+    //double dt = 0.5/simSize;
+    double t;
+//    double a=(r-(1.0/2.0) * sigma * sigma)*dt;
+//    double b=sigma*sqrt(dt);
+    double a=dt*r, b=sigma * sqrt(dt);
     shared_ptr<RNG> rng=make_shared<RNG>();
-//    vector<double> e= rng->rngUsingMTE(simSize*round(T/dt) + 1);
-    vector<double> e= rng->rngUsingBM(simSize*round(T/dt) + 1);
-    int i=0;
-    for (int j = 0; j < simSize; ++j)
+    int tSize=round(T/dt);
+    int rngSize=2*simsize*tSize;
+    vector<double> e = rng->rngUsingBM(rngSize);
+//        cout<<"e size: "<<e.size()<<endl;
+//        rng->writeToFile("SIMRNG",e,simsize,"RNG");
+    double St;
+    vector<double> All(simsize, 0.0);
+    int j = 0;
+    for (int i = 0; i < simsize; i++)
     {
+        t = 0.0;
         St=S0;
-        t=0.0;
-        do{
-            do{
-                St= St*exp( a + b*e[i] );
-                t+=dt;
-                i++;
-            }while(t<T && i<e.size());
-        }while(t<T);
-//        cout<<St<<endl;
-        AllST[j]=St;
+        do
+        {
+//                cout<<j<<endl;
+//            double val=e[j];
+//            St=St*exp(a+b*val);
+            double val=e[j];
+            St = St + (St * a) + (b * St * val);
+//                cout<<"St:"<<St<<"e:"<<e[j]<<endl;
+            t = t + dt;
+            j++;
+        } while (t <= T);
+        All[i] = St;
     }
-    return AllST;
+    return All;
 }
 
-double MonteCarlo::genStockPrices (double S0, double T, double r, double sigma, double dt, int simsize)
+double MonteCarlo::genStockPrices3 (double S0, double T, double r, double sigma, double dt, int simsize)
 {
     double St=S0,t=0.0;
     double a=(r-(1.0/2.0) * sigma * sigma)*dt;
@@ -120,3 +156,23 @@ void MonteCarlo::writeToFile (const string fNamePrefix, unique_ptr<double[]> v, 
 
 }
 
+void
+MonteCarlo::writeToFile (const string fNamePrefix, vector<double> x, vector<double> y, vector<double> ci, const int k)
+{
+    ostringstream iterate_label;
+    iterate_label.width(3);
+    iterate_label.fill('0');
+    iterate_label << k;
+    string file_name = fNamePrefix + iterate_label.str() + ".txt";
+    ofstream oFileStream;
+    oFileStream.open(file_name.c_str());
+    assert(oFileStream.is_open());
+    oFileStream<<setw(12)<<"x"<<setw(12)<<"y"<<setw(12)<<"ci"<<endl;
+    oFileStream<<endl;
+    for (int i = 0; i < x.size(); ++i)
+    {
+        oFileStream<<setw(12)<<x[i]<<setw(12)<<y[i]<<setw(12)<<ci[i]<<endl;
+    }
+    oFileStream.close();
+
+}

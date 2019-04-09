@@ -30,9 +30,9 @@ void runRNGUsingStatsBM2();
 int main ()
 {
     initOptionInfo();
-//    runMonteCarloSimulation();
     runBlackScholes();
-    runEuler();
+    runMonteCarloSimulation();
+//    runEuler();
 //    cout<<endl;
 //    runMonteCarloSimulationForAssetOrNothing();
 //    runEulerAssetOrNothing();
@@ -71,7 +71,7 @@ void runEuler()
     srand(2019);
     unique_ptr<Euler> euler;
     shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
-    const int dtSize = 7;
+    const int dtSize = 6;
     double dt[dtSize] = {0.5, 0.25, 0.125, 0.0625,0.015625,0.0078125};
     vector<double> x(dtSize),y(dtSize),ci(dtSize);
     int simSize = 10000000;
@@ -117,43 +117,79 @@ void runEuler()
 
 void runMonteCarloSimulation()
 {
+    srand(2019);
     unique_ptr<MonteCarlo> mc;
-    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
-    int size=10000;
-    double dt=1.0/365.0;
-    double t=0.0;
-    double D=exp(-optionInfo->getR()*(optionInfo->getT()-t));
-    vector<double> Sj(size,0.0),Vj(size,0.0),SjMinusDT(size,0.0),SjPlusDT(size,0.0);
-    vector<double> VjMinusDT(size,0.0),VjPlusDT(size,0.0);
-    Sj= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),size);
-    for (int j = 0; j < Sj.size(); ++j)
+    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+    const int NSIM = 3;
+    const int MCSIM=100;
+    double simSize[NSIM] = {100,1000,10000};
+    vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
+    double dt = 1.0 / 30.0;
+    double t = 0.0;
+    double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
+    unique_ptr<BlackScholes> bs;
+    vector<double> values = bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(),
+                                                optionInfo->getSigma(), optionInfo->getT());
+    cout<<"BS: "<<values[0]<<endl;
+    for (int i = 0; i < NSIM; ++i)
     {
-    //        cout<<Sj[j]<<endl;
-            Vj[j]=optionInfo->payOff(Sj[j]);
+        double avgMCPrice=0.0;
+        clock_t begin = clock();
+        double MCPrice,avgSigmaHat;
+        for (int l = 0; l < MCSIM; ++l)
+        {
+            vector<double> Sj(simSize[i], 0.0);
+            double payOff = 0.0;
+            Sj = mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,
+                                    simSize[i]);
+            for (int j = 0; j < Sj.size(); ++j)
+            {
+                payOff += optionInfo->payOff(Sj[j]);
+
+            }
+            double avgVT = payOff / Sj.size();
+            double sigmaHatSqr = 0.0;
+            for (int k = 0; k < Sj.size(); ++k)
+            {
+                sigmaHatSqr += (avgVT - optionInfo->payOff(Sj[k])) * (avgVT - optionInfo->payOff(Sj[k]));
+            }
+            avgSigmaHat = sigmaHatSqr / Sj.size();
+            MCPrice=D*avgVT;
+//            cout << MCPrice<<endl;
+            avgMCPrice += MCPrice;
+            y[i]+=(values[0]-MCPrice);
+            ci[i]+=D * 1.96 * sqrt(avgSigmaHat / Sj.size());
+        }
+        cout<<"y before: "<<y[i]<<endl;
+        x[i]=sqrt(1.0/simSize[i]);
+        y[i]=y[i]/MCSIM;
+        ci[i]=ci[i]/MCSIM;
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        cout << "Time Taken for simSize: " << simSize[i] << " is :" << elapsed_secs << endl;
+        cout << "MC Call Price: " << avgMCPrice/MCSIM <<", y: "<< y[i] <<" with CI: (+-) " << ci[i] << endl;
 
     }
-
-    double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
-    cout << "Approximate Stock Price at T : " << avgST << endl;
-
-    double avgVT = accumulate( Vj.begin(), Vj.end(), 0.0)/Vj.size();
-    cout << "MC Call Price: " << D*avgVT <<" , Discounting Factor:"<<D<< endl;
+    mc->writeToFile("MCERROR",x,y,ci,1);
+}
 
     //DELTA SIMULATION
-    SjMinusDT= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT()-dt, optionInfo->getR(),optionInfo->getSigma(),size);
-    SjPlusDT = mc->genStockPrices(optionInfo->getS0(), optionInfo->getT()+dt, optionInfo->getR(),optionInfo->getSigma(),size);
-    for (int j = 0; j < Sj.size(); ++j)
-    {
-        //        cout<<Sj[j]<<endl;
-        VjMinusDT[j]=optionInfo->payOff(SjMinusDT[j]);
-        VjPlusDT[j]=optionInfo->payOff(SjPlusDT[j]);
-    }
+//    SjMinusDT= mc->genStockPrices3(optionInfo->getS0(), optionInfo->getT() - dt, optionInfo->getR(),
+//                                   optionInfo->getSigma(), simSize);
+//    SjPlusDT = mc->genStockPrices3(optionInfo->getS0(), optionInfo->getT() + dt, optionInfo->getR(),
+//                                   optionInfo->getSigma(), simSize);
+//    for (int j = 0; j < Sj.simSize(); ++j)
+//    {
+//                cout<<Sj[j]<<endl;
+//        VjMinusDT[j]=optionInfo->payOff(SjMinusDT[j]);
+//        VjPlusDT[j]=optionInfo->payOff(SjPlusDT[j]);
+//    }
+//
+//    double avgVTMinusDT = accumulate( VjMinusDT.begin(), VjMinusDT.end(), 0.0)/VjMinusDT.simSize();
+//    double avgVTPlusDT = accumulate( VjPlusDT.begin(), VjPlusDT.end(), 0.0)/VjPlusDT.simSize();
+//    cout << "MC Delta: " << ((exp(-optionInfo->getR()*(optionInfo->getT()+dt-t))*avgVTPlusDT)-(exp(-optionInfo->getR()*(optionInfo->getT()-dt-t))*avgVTMinusDT))/(2*dt) << endl;
 
-    double avgVTMinusDT = accumulate( VjMinusDT.begin(), VjMinusDT.end(), 0.0)/VjMinusDT.size();
-    double avgVTPlusDT = accumulate( VjPlusDT.begin(), VjPlusDT.end(), 0.0)/VjPlusDT.size();
-    cout << "MC Delta: " << ((exp(-optionInfo->getR()*(optionInfo->getT()+dt-t))*avgVTPlusDT)-(exp(-optionInfo->getR()*(optionInfo->getT()-dt-t))*avgVTMinusDT))/(2*dt) << endl;
-
-}
+//}
 
 void runBlackScholes()
 {
@@ -195,7 +231,7 @@ void runMonteCarloSimulationForAssetOrNothing()
     double dt=1.0/365.0;
     double t=0.0;
     vector<double> Sj(size,0.0),Vj(size,0.0);
-    Sj= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),size);
+    Sj= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,size);
     for (int j = 0; j < Sj.size(); ++j)
     {
         //        cout<<Sj[j]<<endl;
@@ -463,8 +499,8 @@ void runMCUsingStatsBM()
     clock_t begin=clock();
     for (int i = 1; i <= size; ++i)
     {
-        ST= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,
-                               size);
+        ST= mc->genStockPrices3(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,
+                                size);
         CP+=optionInfo->payOff(ST);
         CPFinal+=optionInfo->payOff(ST);
         double tempCP=D*((double)1/i)*CP;
