@@ -17,9 +17,12 @@ class RNG
 public:
     vector<double> rngUsingBM (int size);    //Box Muller Method
     vector<double> rngUsingPM();    //Polar Marsaglia Method
-    vector<double> rngUsingMTE (int size);   //Mersenne Twister Engine
+    unique_ptr<double[]> rngUsingMTE (int size);   //Mersenne Twister Engine
     unique_ptr<double[]> rngUsingStatsBM (int size);
+    unique_ptr<double[]> rngUsingStatsBM2 (int size);
+    double rngUsingStatsBM ();
     void writeToFile (const string fNamePrefix, unique_ptr<double[]> v, const int size, const int k, string val);
+    void writeToFile (const string fNamePrefix, vector<double> v, const int k, string val);
 
 };
 

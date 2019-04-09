@@ -11,25 +11,25 @@
 #include "MonteCarlo.hpp"
 #include "RNG.hpp"
 
-double MonteCarlo::genStockPrice (double S0, double T, double r, double sigma)
-{
-    double dt=1.0/365.0,t;
-    double StNext,St;
-    St=S0;
-    t=0.0;
-    do{
-        shared_ptr<RNG> rng=make_shared<RNG>();
-        vector<double> e= rng->rngUsingMTE(0);
-        int i=0;
-        do{
-            double epsilon=e[i];
-            St= St+St*exp( ( (r-(1.0/2.0) * sigma * sigma) )*dt + sigma*sqrt(dt)*epsilon );
-            t+=dt;
-            i++;
-        }while(t<T && i<e.size());
-    }while(t<T);
-    return StNext;
-}
+//double MonteCarlo::genStockPrice (double S0, double T, double r, double sigma)
+//{
+//    double dt=1.0/365.0,t;
+//    double StNext,St;
+//    St=S0;
+//    t=0.0;
+//    do{
+//        shared_ptr<RNG> rng=make_shared<RNG>();
+//        vector<double> e= rng->rngUsingMTE(0);
+//        int i=0;
+//        do{
+//            double epsilon=e[i];
+//            St= St+St*exp( ( (r-(1.0/2.0) * sigma * sigma) )*dt + sigma*sqrt(dt)*epsilon );
+//            t+=dt;
+//            i++;
+//        }while(t<T && i<e.size());
+//    }while(t<T);
+//    return StNext;
+//}
 
 double MonteCarlo::genStockPrice2 (double S0, double T, double r, double sigma, vector<double> epsilon)
 {

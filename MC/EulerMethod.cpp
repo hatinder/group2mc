@@ -13,51 +13,72 @@
 #include "RNG.hpp"
 
 
-vector<double> Euler::genStockPrices (double S0, double T, double r, double sigma, int simSize)
+vector<double> Euler::genStockPrices (double S0, double T, double r, double sigma,double dt, int simSize)
 {
-
     //double dt = 0.5/simSize;
-    double dt = 1.0/365.0;
+    int maxSize=1000000;
     double t;
-
-
-
-    double St = S0;
-    vector<double> All(simSize,0.0);
-    double StOld = St;
-
-    int j = 0;
-
-        for (int i = 0; i < simSize; i++) {
-
+    double a=dt*r, b=sigma * sqrt(dt);
+    shared_ptr<RNG> rng=make_shared<RNG>();
+    int rngSize=simSize*round(T/dt);
+    rngSize = rngSize + (rngSize % 2 == 0 ? 2 : 1);
+    if(rngSize<=maxSize+2)
+    {
+        vector<double> e = rng->rngUsingBM(rngSize);
+//        rng->writeToFile("SIMRNG",e,rngSize,"RNG");
+        double St;
+        vector<double> All(simSize, 0.0);
+        int j = 0;
+        for (int i = 0; i < simSize; i++)
+        {
             t = 0.0;
-            St = S0;
-            shared_ptr<RNG> rng=make_shared<RNG>();
-            vector<double> e= rng->rngUsingBM(simSize*round(T/dt) + 1);
-            j = 0;
-            StOld = S0;
-
-            do{
-
-                St = StOld + (StOld * dt*r) + (sigma * sqrt(dt) * StOld * e[j]);
-                StOld = St;
-
-
+            St=S0;
+            do
+            {
+                St = St + (St * a) + (b * St * e[j]);
+//                cout<<"St:"<<St<<"e:"<<e[j]<<endl;
                 t = t + dt;
                 j++;
-
-            }while(t <= T);
-
-            //std::cout << "The St is: " << St <<"\n";
-
+            } while (t <= T);
             All[i] = St;
-
         }
+        return All;
+    }
+    else
+    {
+        int loopSize=floor(rngSize/maxSize);
+        vector<int> sizeInfo(loopSize+1);
+        int k=0;
+        for (k = 0; k < loopSize; ++k)
+        {
+            sizeInfo[k]=maxSize;
+        }
+        sizeInfo[k]=rngSize-loopSize*maxSize;
+        vector<double> e = rng->rngUsingBM(maxSize);
+        double St = S0;
+        vector<double> All(simSize, 0.0);
+        int j = 0,si=1;
+        for (int i = 0; i < simSize; i++)
+        {
+            t = 0.0;
+            St = S0;
+            do
+            {
 
-
-
-    return All;
-
+                St = St + (St * a) + (b * St * e[j]);
+                t = t + dt;
+                j++;
+                if(j==maxSize)
+                {
+                    e=rng->rngUsingBM(sizeInfo[si++]);
+                    j=0;
+                }
+            } while (t <= T);
+            //std::cout << "The St is: " << St <<"\n";
+            All[i] = St;
+            }
+            return All;
+    }
 }
 
 double Euler::getStockPrice (double S0, double T, double r, double sigma, double dt)
@@ -78,7 +99,7 @@ double Euler::getStockPrice (double S0, double T, double r, double sigma, double
         StOld=St;
         t=t+2*dt;
     }
-    bmVal.release();
+//    bmVal.release();
     return St;
 }
 
@@ -139,4 +160,25 @@ void Euler::writeToFile (const string fNamePrefix, unique_ptr<double[]> x,unique
         oFileStream<<setw(12)<<x[i]<<setw(12)<<y[i]<<setw(12)<<ci[i]<<endl;
     }
     oFileStream.close();
+}
+
+void
+Euler::writeToFile (const string fNamePrefix, vector<double> x, vector<double> y, vector<double> ci, const int k)
+{
+    ostringstream iterate_label;
+    iterate_label.width(3);
+    iterate_label.fill('0');
+    iterate_label << k;
+    string file_name = fNamePrefix + iterate_label.str() + ".txt";
+    ofstream oFileStream;
+    oFileStream.open(file_name.c_str());
+    assert(oFileStream.is_open());
+    oFileStream<<setw(12)<<"x"<<setw(12)<<"y"<<setw(12)<<"ci"<<endl;
+    oFileStream<<endl;
+    for (int i = 0; i < x.size(); ++i)
+    {
+        oFileStream<<setw(12)<<x[i]<<setw(12)<<y[i]<<setw(12)<<ci[i]<<endl;
+    }
+    oFileStream.close();
+
 }

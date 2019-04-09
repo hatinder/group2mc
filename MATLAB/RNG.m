@@ -2,8 +2,11 @@ filename2E = '..\MC\cmake-build-debug\RNG001.txt';
 delimiterIn = ' ';
 headerlinesIn = 1;
 D2E = importdata(filename2E, delimiterIn,headerlinesIn);
-
-histogram(D2E.data(:,1));
+x = [-3:.1:3];
+y = normpdf(x,0,1);
+histfit(D2E.data(:,1));
+disp(length(D2E.data(:,1)));
+disp(length(unique(D2E.data(:,1))));
 disp(length(D2E.data(:,1))-length(unique(D2E.data(:,1))));
 %plot(D2E.data(:,1),D2E.data(:,201));
 grid on;

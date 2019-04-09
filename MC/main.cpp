@@ -12,36 +12,48 @@ random_device rdStats;
 
 void initOptionInfo();
 void runMonteCarloSimulation();
-void runRNG();
+void runRNG (int size);
 void runEuler();
 void runBlackScholes();
 void runEulerAssetOrNothing();
 void runMonteCarloSimulationForAssetOrNothing();
 void runAssetOrNothing();
 void runRNGUsingStatsBM();
+void runRNGUsingStatsBM1 (int size);
 void runWeakEulerStockPrice();
 void runWeakEulerMCCP();
 void runMCUsingStatsBM();
 void runWeakEulerConvergenceWithDt();
 void runWeakEulerConvergenceMCError();
+void runRNGUsingStatsBM2();
 
 int main ()
 {
     initOptionInfo();
 //    runMonteCarloSimulation();
-//    runEuler();
     runBlackScholes();
+    runEuler();
 //    cout<<endl;
 //    runMonteCarloSimulationForAssetOrNothing();
 //    runEulerAssetOrNothing();
 //    runAssetOrNothing();
 //    runRNGUsingStatsBM();
+//    clock_t begin=clock();
+//    runRNGUsingStatsBM1(10000000);
+//    clock_t end=clock();
+//    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//    cout<<"Time Taken UP: "<<elapsed_secs<<endl;
 //    runWeakEulerStockPrice();
 //    runWeakEulerMCCP();
 //    runMCUsingStatsBM();
-//    runRNG();
-    runWeakEulerConvergenceWithDt();
+//    begin=clock();
+//    runRNG(10000000);
+//    end=clock();
+//    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//    cout<<"Time Taken vector: "<<elapsed_secs<<endl;
+//    runWeakEulerConvergenceWithDt();
 //    runWeakEulerConvergenceMCError();
+//    runRNGUsingStatsBM2();
     return 0;
 }
 
@@ -56,25 +68,51 @@ void initOptionInfo()
 
 void runEuler()
 {
+    srand(2019);
     unique_ptr<Euler> euler;
-    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
-    int size=100;
+    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+    const int dtSize = 5;
+    double dt[dtSize] = {0.5, 0.2, 0.1, 0.05,0.02};
+    vector<double> x(dtSize),y(dtSize),ci(dtSize);
+    int simSize = 1000;
     double t = 0.0;
-
-    vector<double> Sj(size,0.0),Vj(size,0.0),SjMinusDT(size,0.0),SjPlusDT(size,0.0);
-    vector<double> VjMinusDT(size,0.0),VjPlusDT(size,0.0);
-    Sj = euler->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),size);
-    for (int j = 0; j < Sj.size(); ++j)
+    double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
+    unique_ptr<BlackScholes> bs;
+    vector<double> values= bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
+                                               optionInfo->getT());
+//    ,SjMinusDT(simSize,0.0),SjPlusDT(simSize,0.0);
+//    vector<double> VjMinusDT(simSize,0.0),VjPlusDT(simSize,0.0);
+    int p=0;
+    for (int i = 0; i < dtSize; ++i)
     {
-        Vj[j]=optionInfo->payOff(Sj[j]);
+        vector<double> Sj(simSize), Vj(simSize);
+        double sigmaHatSqr=0.0;
+        clock_t begin = clock();
+        Sj = euler->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(),
+                                   dt[i], simSize);
+        cout << "SJ Size:" << Sj.size() << endl;
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
+        for (int j = 0; j < Sj.size(); ++j)
+        {
+            Vj[j] = optionInfo->payOff(Sj[j]);
+        }
+//        double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+//        cout << "Approximate Stock Price at T : " << avgST << endl;
+        double avgVT = accumulate(Vj.begin(), Vj.end(), 0.0) / Vj.size();
+        double eulerCallPrice=D * avgVT;
+        for (int k = 0; k < Vj.size(); ++k)
+        {
+            sigmaHatSqr += (avgVT - Vj[k]) * (avgVT - Vj[k]);
+        }
+        double avgSigmaHat =sigmaHatSqr/Vj.size();
+        cout << "Euler Call Price: " << eulerCallPrice  << " with CI: (+-) " << D * 1.96 * sqrt(avgSigmaHat / Vj.size()) << endl;
+        x[i]=dt[i];
+        y[i]=values[0]-eulerCallPrice;
+        ci[i]=D * 1.96 * sqrt(avgSigmaHat / Vj.size());
     }
-
-    double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
-    cout << "Approximate Stock Price at T : " << avgST << endl;
-
-    double avgVT = accumulate( Vj.begin(), Vj.end(), 0.0)/Vj.size();
-    cout << "Euler Call Price: " << exp(-optionInfo->getR()*(optionInfo->getT()-t))*avgVT << endl;
-
+    euler->writeToFile("EULER",x,y,ci,1);
 }
 
 void runMonteCarloSimulation()
@@ -133,10 +171,10 @@ void runEulerAssetOrNothing()
     unique_ptr<Euler> mc;
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
     int size=100;
-    double t = 0.0;
+    double t = 0.0,dt=1.0/365.0;
 
     vector<double> Sj(size,0.0),Vj(size,0.0);
-    Sj = mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),size);
+    Sj = mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),dt,size);
     for (int j = 0; j < Sj.size(); ++j)
     {
         Vj[j]=optionInfo->payOffForAssetOrNothing(Sj[j]);
@@ -186,16 +224,43 @@ void runAssetOrNothing()
 void runRNGUsingStatsBM()
 {
 
-    srand(time(0));
-    int size=10000;
+    srand(1);
+    int size=1000000;
     unique_ptr<double[]> bm{new double[size]()};
     unique_ptr<RNG> rng;
+    int j=1;
     for (int i = 0; i < size; i=i+2)
     {
         bm[i]= rng->rngUsingStatsBM(0)[0];
         bm[i+1]= rng->rngUsingStatsBM(0)[1];
+        if(i%10000==0)
+        {
+            cout<<"Generated: "<< i<<" random numbers. "<<endl;
+//            srand(++j);
+        }
     }
     rng->writeToFile("RNG",move(bm),size,1,"rng");
+}
+
+void runRNGUsingStatsBM1 (int size)
+{
+
+    srand(1);
+    unique_ptr<double[]> bm{new double[size]()};
+    unique_ptr<RNG> rng;
+    bm=rng->rngUsingMTE(size);
+    rng->writeToFile("RNG",move(bm),size,3,"rng");
+}
+
+void runRNGUsingStatsBM2()
+{
+
+    srand(1);
+    int size=1000000;
+    unique_ptr<double[]> bm{new double[size]()};
+    unique_ptr<RNG> rng;
+    bm=rng->rngUsingMTE(size);
+    rng->writeToFile("RNG",move(bm),size,4,"rng");
 }
 
 
@@ -320,9 +385,9 @@ void runWeakEulerConvergenceWithDt()
 
 //    srand(time(0));
     srand(1);
-    const int size=7;
-    const int NSIM=1000000;
-    double dt[size]={1.0/2.0,1.0/4.0,1.0/8.0,1.0/16.0,1.0/32.0,1.0/64.0,1.0/128.0};
+    const int size=4;
+    const int NSIM=10000;
+    double dt[size]={0.25,0.01,0.0025,0.001};
     double ST,CPFinal=0.0,sigmahatsqr;
     unique_ptr<BlackScholes> bs;
     unique_ptr<Euler> euler;
@@ -355,6 +420,9 @@ void runWeakEulerConvergenceWithDt()
         {
             sigmaCalc += (iVal[j] - CPFinal) * (iVal[j] - CPFinal);
         }
+        clock_t end=clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        cout<<"Time Taken NSIM: "<<elapsed_secs<<endl;
         sigmahatsqr = ((double) 1 / NSIM) * sigmaCalc;
         double eulerCallPrice = D * ((double) 1 / NSIM) * CP;
         double CI=D * ((1.96) * sqrt((double) sigmahatsqr / NSIM));
@@ -367,7 +435,8 @@ void runWeakEulerConvergenceWithDt()
         j++;
     }
 
-//    CPFinal=((double)1/size)*CP;
+
+    //    CPFinal=((double)1/size)*CP;
 //    for (int j = 0; j < size; ++j)
 //    {
 //        sigmaCalc=(iVal[j]-CPFinal)*(iVal[j]-CPFinal);
@@ -409,20 +478,20 @@ void runMCUsingStatsBM()
 
 }
 
-void runRNG()
+void runRNG (int size)
 {
-    int size=10000;
-    unique_ptr<double[]> bm{new double[size]()};
+    srand(1);
     vector<double> v;
     unique_ptr<RNG> rng;
-    for (int i = 0; i < size; i=i+2)
-    {
-        v= rng->rngUsingBM(size);
-    }
-    for (int j = 0; j < v.size(); ++j)
-    {
-        bm[j]=v[j];
-    }
-    rng->writeToFile("RNG",move(bm),size,2,"rng");
+     v= rng->rngUsingBM(size);
+    rng->writeToFile("RNG",v,2,"rng");
+
+}
+
+void runWeakEulerConvergenceWithDtF()
+{
+
+//    srand(time(0));
+    srand(1);
 
 }
