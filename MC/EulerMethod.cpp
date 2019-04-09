@@ -78,6 +78,7 @@ double Euler::getStockPrice (double S0, double T, double r, double sigma, double
         StOld=St;
         t=t+2*dt;
     }
+    bmVal.release();
     return St;
 }
 
@@ -99,5 +100,43 @@ void Euler::writeToFile (const string fNamePrefix, unique_ptr<double[]> v, const
         oFileStream<<setw(12)<<i<<setw(12)<<v[i]<<endl;
     }
     oFileStream.close();
+}
 
+
+void Euler::writeToFile (const string fNamePrefix, unique_ptr<double[]> x,unique_ptr<double[]> y, const int size, const int k)
+{
+    ostringstream iterate_label;
+    iterate_label.width(3);
+    iterate_label.fill('0');
+    iterate_label << k;
+    string file_name = fNamePrefix + iterate_label.str() + ".txt";
+    ofstream oFileStream;
+    oFileStream.open(file_name.c_str());
+    assert(oFileStream.is_open());
+    oFileStream<<setw(12)<<"x"<<setw(12)<<"y"<<endl;
+    oFileStream<<endl;
+    for (int i = 0; i < size; ++i)
+    {
+        oFileStream<<setw(12)<<x[i]<<setw(12)<<y[i]<<endl;
+    }
+    oFileStream.close();
+}
+
+void Euler::writeToFile (const string fNamePrefix, unique_ptr<double[]> x,unique_ptr<double[]> y,unique_ptr<double[]> ci, const int size, const int k)
+{
+    ostringstream iterate_label;
+    iterate_label.width(3);
+    iterate_label.fill('0');
+    iterate_label << k;
+    string file_name = fNamePrefix + iterate_label.str() + ".txt";
+    ofstream oFileStream;
+    oFileStream.open(file_name.c_str());
+    assert(oFileStream.is_open());
+    oFileStream<<setw(12)<<"x"<<setw(12)<<"y"<<setw(12)<<"ci"<<endl;
+    oFileStream<<endl;
+    for (int i = 0; i < size; ++i)
+    {
+        oFileStream<<setw(12)<<x[i]<<setw(12)<<y[i]<<setw(12)<<ci[i]<<endl;
+    }
+    oFileStream.close();
 }

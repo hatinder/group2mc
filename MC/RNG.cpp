@@ -68,13 +68,13 @@ vector<double> RNG::rngUsingMTE (int size)
 unique_ptr<double[]> RNG::rngUsingStatsBM (int size)
 {
     unique_ptr<double[]> bm{new double[2]()};
-    random_device rd;
-    mt19937 gen(rdStats());
-    uniform_real_distribution<> distribution(0.0,1.0);
-//    double r=runif(0.0,1.0,rand());
-//    double phi=runif(0.0,1.0,rand());
-    double r=distribution(gen);
-    double phi=distribution(gen);
+//    random_device rd;
+//    mt19937 gen(rdStats());
+//    uniform_real_distribution<> distribution(0.0,1.0);
+    double r=runif(0.0,1.0,rand());
+    double phi=runif(0.0,1.0,rand());
+//    double r=distribution(gen);
+//    double phi=distribution(gen);
     bm[0]=sqrt(-2*log(r))*cos(2*M_PI*phi);
     bm[1]=sqrt(-2*log(r))*sin(2*M_PI*phi);
 //    cout<<bm[0]<<endl;

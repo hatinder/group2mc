@@ -22,6 +22,8 @@ void runRNGUsingStatsBM();
 void runWeakEulerStockPrice();
 void runWeakEulerMCCP();
 void runMCUsingStatsBM();
+void runWeakEulerConvergenceWithDt();
+void runWeakEulerConvergenceMCError();
 
 int main ()
 {
@@ -33,11 +35,13 @@ int main ()
 //    runMonteCarloSimulationForAssetOrNothing();
 //    runEulerAssetOrNothing();
 //    runAssetOrNothing();
-    runRNGUsingStatsBM();
+//    runRNGUsingStatsBM();
 //    runWeakEulerStockPrice();
 //    runWeakEulerMCCP();
 //    runMCUsingStatsBM();
 //    runRNG();
+    runWeakEulerConvergenceWithDt();
+//    runWeakEulerConvergenceMCError();
     return 0;
 }
 
@@ -216,7 +220,8 @@ void runWeakEulerStockPrice()
 void runWeakEulerMCCP()
 {
 
-    srand(time(0));
+//    srand(time(0));
+    srand(2019);
     double dt=1.0/365.0;
     double CP=0.0, ST,CPFinal=0.0,sigmahatsqr, sigmaCalc;
     int size=10000;
@@ -245,7 +250,7 @@ void runWeakEulerMCCP()
             sigmahatsqr=((double)1/i)*sigmaCalc;
             double tempCP=D*((double)1/i)*CP;
             cout<<"Weak Euler Call Price : "<<tempCP <<" , Simulation Size: "<< i<<endl;
-            cout<<"Confidence Interval : [ "<<D*(CPFinal-(1.96)*sqrt((double)sigmahatsqr/i))<<" , "<<D*(CPFinal+(1.96)*sqrt((double)sigmahatsqr/i))<<" ]" <<endl;
+            cout<<"Confidence Interval : [ "<<D*(-(1.96)*sqrt((double)sigmahatsqr/i))<<" , "<<D*((1.96)*sqrt((double)sigmahatsqr/i))<<" ]" <<endl;
         }
     }
     CPFinal=((double)1/size)*CP;
@@ -258,8 +263,123 @@ void runWeakEulerMCCP()
     euler->writeToFile("CP",move(cpVal),size,1);
     cout<<"Weak Euler Call Price : "<<CP<<endl;
 //    cout<<"Sigma hat squared: "<<CPFinal-1.96*sqrt(sigmahatsqr/size)<<endl;
-    cout<<"Confidence Interval : [ "<<D*(CPFinal-(1.96)*sqrt((double)sigmahatsqr/size))<<" , "<<D*(CPFinal+(1.96)*sqrt((double)sigmahatsqr/size))<<" ]" <<endl;
+    cout<<"Confidence Interval : [ "<<D*(-(1.96)*sqrt((double)sigmahatsqr/size))<<" , "<<D*((1.96)*sqrt((double)sigmahatsqr/size))<<" ]" <<endl;
 }
+
+void runWeakEulerConvergenceMCError()
+{
+
+//    srand(time(0));
+    srand(1);
+    const int csize=10;
+    double dt=1.0/365.0;
+    double CP=0.0, ST,CPFinal=0.0,sigmahatsqr, sigmaCalc;
+    int size=10000;
+    unique_ptr<double[]> x{new double[csize]()};
+    unique_ptr<double[]> y{new double[csize]()};
+    unique_ptr<double[]> ci{new double[csize]()};
+//    unique_ptr<double[]> cpVal{new double[size]()};
+    unique_ptr<double[]> iVal{new double[size]()};
+    unique_ptr<Euler> euler;
+    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
+    unique_ptr<BlackScholes> bs;
+    vector<double> values= bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
+                                               optionInfo->getT());
+    double D=exp(-optionInfo->getR()*optionInfo->getT());
+    int j=0;
+    for (int i = 1; i <= size; i++)
+    {
+        ST=euler->getStockPrice(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),optionInfo->getSigma(),dt);
+        CP+=optionInfo->payOff(ST);
+        iVal[i-1]=optionInfo->payOff(ST);
+//        CP+=(ST-optionInfo->getK());
+//        iVal[i-1]=(ST-optionInfo->getK());
+        if(i%1000==0)
+        {
+            CPFinal=((double)1/i)*CP;
+            for (int j = 0; j < i; ++j)
+            {
+                sigmaCalc+=(iVal[j]-CPFinal)*(iVal[j]-CPFinal);
+            }
+            sigmahatsqr=((double)1/i)*sigmaCalc;
+            double tempCP=D*((double)1/i)*CP;
+            double CI=D*((1.96)*sqrt((double)sigmahatsqr/i));
+            cout<<"Weak Euler Call Price : "<<tempCP <<" CI: (+-) "<<CI<<" , Simulation Size: "<< i<<endl;
+            x[j]=i;
+            y[j]=values[0]-tempCP;
+            ci[j]=CI;
+            j++;
+        }
+    }
+    euler->writeToFile("CIvsM",move(x),move(y),move(ci),csize,1);
+}
+
+
+void runWeakEulerConvergenceWithDt()
+{
+
+//    srand(time(0));
+    srand(1);
+    const int size=7;
+    const int NSIM=1000000;
+    double dt[size]={1.0/2.0,1.0/4.0,1.0/8.0,1.0/16.0,1.0/32.0,1.0/64.0,1.0/128.0};
+    double ST,CPFinal=0.0,sigmahatsqr;
+    unique_ptr<BlackScholes> bs;
+    unique_ptr<Euler> euler;
+    unique_ptr<double[]> x{new double[size]()};
+    unique_ptr<double[]> y{new double[size]()};
+    unique_ptr<double[]> ci{new double[size]()};
+    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
+    vector<double> values= bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
+                                               optionInfo->getT());
+    double D=exp(-optionInfo->getR()*optionInfo->getT());
+    int j=0;
+    for (int d = 0; d < size ; d++) //k = simulation size
+    {
+        double CP=0.0;
+        unique_ptr<double[]> cpVal{new double[NSIM]()};
+        unique_ptr<double[]> iVal{new double[NSIM]()};
+        clock_t begin=clock();
+        for (int i = 0; i < NSIM; i++)
+        {
+            ST = euler->getStockPrice(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),
+                                      optionInfo->getSigma(), dt[d]);
+            CP += optionInfo->payOff(ST);
+            iVal[i] = optionInfo->payOff(ST);
+            double tempCP = D * ((double) 1 / i) * CP;
+            cpVal[i] = tempCP;
+        }
+        CPFinal = ((double) 1 / NSIM) * CP;
+        double sigmaCalc=0;
+        for (int j = 0; j < NSIM; ++j)
+        {
+            sigmaCalc += (iVal[j] - CPFinal) * (iVal[j] - CPFinal);
+        }
+        sigmahatsqr = ((double) 1 / NSIM) * sigmaCalc;
+        double eulerCallPrice = D * ((double) 1 / NSIM) * CP;
+        double CI=D * ((1.96) * sqrt((double) sigmahatsqr / NSIM));
+        cout << "Weak Euler Call Price : " << eulerCallPrice << " (+-) CI: "
+             << CI << " , Simulation Size: " << NSIM << ", dt: " << dt[d]
+             << endl;
+        x[j]=dt[d];
+        y[j]=values[0]-eulerCallPrice;
+        ci[j]=CI;
+        j++;
+    }
+
+//    CPFinal=((double)1/size)*CP;
+//    for (int j = 0; j < size; ++j)
+//    {
+//        sigmaCalc=(iVal[j]-CPFinal)*(iVal[j]-CPFinal);
+//    }
+//    sigmahatsqr=((double)1/size)*sigmaCalc;
+//    CP=D*((double)1/size)*CP;
+        euler->writeToFile("CIvsDT",move(x),move(y),move(ci),size,1);
+//    cout<<"Weak Euler Call Price : "<<CP<<endl;
+////    cout<<"Sigma hat squared: "<<CPFinal-1.96*sqrt(sigmahatsqr/size)<<endl;
+//    cout<<"Confidence Interval : [ "<<D*(-(1.96)*sqrt((double)sigmahatsqr/size))<<" , "<<D*((1.96)*sqrt((double)sigmahatsqr/size))<<" ]" <<endl;
+}
+
 
 void runMCUsingStatsBM()
 {
