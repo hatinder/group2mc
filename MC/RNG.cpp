@@ -18,7 +18,7 @@ vector<double> RNG::rngUsingBM (int size)
     vector<double> rng(size);
     mt19937 gen(rand());
     uniform_real_distribution<> distribution(0,1);
-    for (int i = 0; i < size-1; i=i+2)
+    for (int i = 0; i < size; i=i+2)
     {
         double r=distribution(gen);
         double phi=distribution(gen);

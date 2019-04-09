@@ -20,11 +20,14 @@ vector<double> Euler::genStockPrices (double S0, double T, double r, double sigm
     double t;
     double a=dt*r, b=sigma * sqrt(dt);
     shared_ptr<RNG> rng=make_shared<RNG>();
-    int rngSize=simSize*round(T/dt);
-    rngSize = rngSize + (rngSize % 2 == 0 ? 2 : 1);
-    if(rngSize<=maxSize+2)
+    int tSize=round(T/dt);
+    int rngSize=2*simSize*tSize;
+//    rngSize = rngSize + (rngSize % 2 == 0 ? 2 : 1);
+    cout<<"simSize: "<<simSize<<" , tSize: "<<tSize <<", rngSize:"<< rngSize<<endl;
+    if(rngSize<=maxSize)
     {
         vector<double> e = rng->rngUsingBM(rngSize);
+        cout<<"e size: "<<e.size()<<endl;
 //        rng->writeToFile("SIMRNG",e,rngSize,"RNG");
         double St;
         vector<double> All(simSize, 0.0);
@@ -35,7 +38,9 @@ vector<double> Euler::genStockPrices (double S0, double T, double r, double sigm
             St=S0;
             do
             {
-                St = St + (St * a) + (b * St * e[j]);
+                cout<<j<<endl;
+                double val=e[j];
+                St = St + (St * a) + (b * St * val);
 //                cout<<"St:"<<St<<"e:"<<e[j]<<endl;
                 t = t + dt;
                 j++;
