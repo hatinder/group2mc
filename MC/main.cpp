@@ -71,10 +71,10 @@ void runEuler()
     srand(2019);
     unique_ptr<Euler> euler;
     shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
-    const int dtSize = 5;
-    double dt[dtSize] = {0.5, 0.2, 0.1, 0.05,0.02};
+    const int dtSize = 7;
+    double dt[dtSize] = {0.5, 0.25, 0.125, 0.0625,0.015625,0.0078125};
     vector<double> x(dtSize),y(dtSize),ci(dtSize);
-    int simSize = 1000;
+    int simSize = 10000000;
     double t = 0.0;
     double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
     unique_ptr<BlackScholes> bs;
