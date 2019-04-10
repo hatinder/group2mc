@@ -118,6 +118,54 @@ vector<double> MonteCarlo::genStockPrices (double S0, double T, double r, double
     return All;
 }
 
+vector<vector<double>> MonteCarlo::genStockPricesForDelta (double S0, double T, double r, double sigma, double dt, int simsize)
+{
+    //double dt = 0.5/simSize;
+    double t;
+//    double a=(r-(1.0/2.0) * sigma * sigma)*dt;
+//    double b=sigma*sqrt(dt);
+    double a=dt*r, b=sigma * sqrt(dt);
+    shared_ptr<RNG> rng=make_shared<RNG>();
+    int tSize=round(T/dt);
+    int rngSize=2*simsize*tSize;
+    vector<double> e = rng->rngUsingBM(rngSize);
+//        cout<<"e size: "<<e.size()<<endl;
+//        rng->writeToFile("SIMRNG",e,simsize,"RNG");
+    double StPlus, StMinus;
+    vector<vector<double>> All;
+    vector<double> AllPlus(simsize);
+    vector<double> AllMinus(simsize);
+    int j = 0;
+    for (int i = 0; i < simsize; i++)
+    {
+        t = 0.0;
+        StPlus=S0;
+        StMinus=S0;
+        do
+        {
+//                cout<<j<<endl;
+//            double val=e[j];
+//            St=St*exp(a+b*val);
+            double val=e[j];
+            StPlus = StPlus + (StPlus * a) + (b * StPlus * val);
+            if(t<=T-dt)
+            {
+                StMinus = StMinus + (StMinus * a) + (b * StMinus * val);
+            }
+//                cout<<"St:"<<St<<"e:"<<e[j]<<endl;
+            t = t + dt;
+            j++;
+        } while (t <= T+dt);
+        AllPlus[i] = StPlus;
+        AllMinus[i] = StMinus;
+    }
+//    cout<<"AllPlus[0]: "<<AllPlus[0]<<endl;
+//    cout<<"AllMinus[0]: "<<AllMinus[0]<<endl;
+    All.push_back(AllPlus);
+    All.push_back(AllMinus);
+    return All;
+}
+
 vector<double> MonteCarlo::genStockPricesT (double S0, double T, double r, double sigma, double dt, int simsize)
 {
     //double dt = 0.5/simSize;
