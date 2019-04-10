@@ -120,11 +120,11 @@ void runMonteCarloSimulation()
     srand(2019);
     unique_ptr<MonteCarlo> mc;
     shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
-    const int NSIM = 3;
-    const int MCSIM=100;
-    double simSize[NSIM] = {100,1000,10000};
+    const int NSIM = 5;
+    const int MCSIM=1000;
+    double simSize[NSIM] = {1000,2000,3000,4000,5000};
     vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
-    double dt = 1.0 / 30.0;
+    double dt = 1.0 / 365.0;
     double t = 0.0;
     double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
     unique_ptr<BlackScholes> bs;
@@ -142,6 +142,8 @@ void runMonteCarloSimulation()
             double payOff = 0.0;
             Sj = mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,
                                     simSize[i]);
+//            double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+//            cout << "Approximate Stock Price at T : " << avgST << endl;
             for (int j = 0; j < Sj.size(); ++j)
             {
                 payOff += optionInfo->payOff(Sj[j]);
