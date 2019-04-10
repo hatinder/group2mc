@@ -55,7 +55,7 @@ int main (int argc, char *argv[])
 //    runWeakEulerMCCP();
 //    runMCUsingStatsBM();
 //    begin=clock();
-//    runRNG(10000000);
+//    runRNG(1000);
 //    end=clock();
 //    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
 //    cout<<"Time Taken vector: "<<elapsed_secs<<endl;
@@ -129,8 +129,8 @@ void runMonteCarloSimulation()
     unique_ptr<MonteCarlo> mc;
     shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     const int NSIM = 5;
-    const int MCSIM=10;
-    double simSize[NSIM] = {100000,200000,300000,400000,500000};
+    const int MCSIM=1000;
+    double simSize[NSIM] = {1000,2000,3000,4000,500};
     vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
     double dt = 1.0 / 365.0;
     double t = 0.0;
@@ -138,12 +138,13 @@ void runMonteCarloSimulation()
     unique_ptr<BlackScholes> bs;
     vector<double> values = bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(),
                                                 optionInfo->getSigma(), optionInfo->getT());
-    cout<<"BS: "<<values[0]<<endl;
+//    cout<<"BS: "<<values[0]<<endl;
     for (int i = 0; i < NSIM; ++i)
     {
         double avgMCPrice=0.0;
         clock_t begin = clock();
         double MCPrice,avgSigmaHat;
+        vector<double> mcPrice(MCSIM,0.0),mcError(MCSIM,0.0);
         for (int l = 0; l < MCSIM; ++l)
         {
             vector<double> Sj(simSize[i], 0.0);
@@ -165,11 +166,15 @@ void runMonteCarloSimulation()
             }
             avgSigmaHat = sigmaHatSqr / Sj.size();
             MCPrice=D*avgVT;
+            mcPrice[l]=MCPrice;
+            mcError[l]=(values[0]-MCPrice);
 //            cout << MCPrice<<endl;
             avgMCPrice += MCPrice;
             y[i]+=(values[0]-MCPrice);
             ci[i]+=D * 1.96 * sqrt(avgSigmaHat / Sj.size());
         }
+        mc->writeToFile("MCPRICE",mcPrice,i,"MCP");
+        mc->writeToFile("MCERR",mcError,i,"ERR");
         cout<<"y before: "<<y[i]<<endl;
         x[i]=sqrt(1.0/simSize[i]);
         y[i]=y[i]/MCSIM;
@@ -189,11 +194,12 @@ void runMCDelta(int sSize)
     srand(2019);
     unique_ptr<MonteCarlo> mc;
     shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
-    const int NSIM = 1;
-    const int MCSIM=10;
-    int simSize=sSize+1;
+    const int NSIM = 4;
+    const int MCSIM = 100;
+    int simSize;
     vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
     double dt = 1.0 / 365.0;
+    double dS=1.0;
     double t = 0.0;
     double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
     unique_ptr<BlackScholes> bs;
@@ -206,12 +212,14 @@ void runMCDelta(int sSize)
         double avgMCPricePlus=0.0,avgMCPriceMinus=0.0;
         clock_t begin = clock();
         double MCPlus,MCMinus,avgSigmaHat;
+        vector<double> mcDelta(MCSIM,0.0),mcError(MCSIM,0.0);
         for (int l = 0; l < MCSIM; ++l)
         {
             vector<vector<double>> Sj;
             double payOffMinus = 0.0,payOffPlus=0.0;
-            Sj = mc->genStockPricesForDelta(optionInfo->getS0(), optionInfo->getT()+dt, optionInfo->getR(), optionInfo->getSigma(), dt,
-                                    simSize);
+            Sj = mc->genStockPricesForDelta(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),
+                                            optionInfo->getSigma(), dt, dS,
+                                            simSize);
 //            double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
 //            cout << "Approximate Stock Price at T : " << avgST << endl;
 //            cout<<"Sj[0][0]"<<Sj[0][0]<<endl;
@@ -221,17 +229,17 @@ void runMCDelta(int sSize)
                 payOffPlus += optionInfo->payOff(Sj[0][j]);
 
             }
-            cout<<"Pay Off Plus: "<<payOffPlus<<endl;
+//            cout<<"Pay Off Plus: "<<payOffPlus<<endl;
             for (int j = 0; j < simSize; ++j)
             {
                 payOffMinus += optionInfo->payOff(Sj[1][j]);
 
             }
-            cout<<"Pay Off Minus: "<<payOffMinus<<endl;
+//            cout<<"Pay Off Minus: "<<payOffMinus<<endl;
             double avgVTPlus = payOffPlus / simSize;
             double avgVTMinus = payOffMinus / simSize;
-            cout<<"avgVTPlus: "<<avgVTPlus<<endl;
-            cout<<"avgVTMinus: "<<avgVTMinus<<endl;
+//            cout<<"avgVTPlus: "<<avgVTPlus<<endl;
+//            cout<<"avgVTMinus: "<<avgVTMinus<<endl;
             double sigmaHatSqr = 0.0;
             for (int k = 0; k < simSize; ++k)
             {
@@ -243,18 +251,22 @@ void runMCDelta(int sSize)
 //            cout << MCPrice<<endl;
             avgMCPricePlus += MCPlus;
             avgMCPriceMinus += MCMinus;
-            cout<<"avgPricePlus"<<avgMCPricePlus<<endl;
-            cout<<"avgPriceMinus"<<avgMCPriceMinus<<endl;
+            mcDelta[l]=(MCPlus-MCMinus)/(2*dS);
+            mcError[l]=values[1]-mcDelta[l];
+//            cout<<"avgPricePlus"<<avgMCPricePlus<<endl;
+//            cout<<"avgPriceMinus"<<avgMCPriceMinus<<endl;
             ci[i]+=D * 1.96 * sqrt(avgSigmaHat / simSize);
         }
-        cout<<"y before: "<<y[i]<<endl;
+//        cout<<"y before: "<<y[i]<<endl;
+        mc->writeToFile("MCDELTA",mcDelta,i,"MCP");
+        mc->writeToFile("MCDELTAERR",mcError,i,"ERR");
         x[i]=sqrt(1.0/simSize);
         y[i]=y[i]/MCSIM;
         ci[i]=ci[i]/MCSIM;
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
-        cout << "MC Delta : " << (avgMCPricePlus-avgMCPriceMinus)/(MCSIM*2*dt) <<", y: "<< y[i] <<" with CI: (+-) " << ci[i] << endl;
+        cout << "MC Delta : " << (avgMCPricePlus-avgMCPriceMinus)/(MCSIM*2*dS) <<", y: "<< y[i] <<" with CI: (+-) " << ci[i] << endl;
 
     }
     mc->writeToFile("MCERROR",x,y,ci,1);

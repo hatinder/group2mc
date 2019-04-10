@@ -91,7 +91,7 @@ vector<double> MonteCarlo::genStockPrices (double S0, double T, double r, double
     double a=dt*r, b=sigma * sqrt(dt);
     shared_ptr<RNG> rng=make_shared<RNG>();
     int tSize=round(T/dt);
-    int rngSize=2*simsize*tSize;
+    int rngSize=simsize*tSize + simsize;
     vector<double> e = rng->rngUsingBM(rngSize);
 //        cout<<"e size: "<<e.size()<<endl;
 //        rng->writeToFile("SIMRNG",e,simsize,"RNG");
@@ -112,58 +112,99 @@ vector<double> MonteCarlo::genStockPrices (double S0, double T, double r, double
 //                cout<<"St:"<<St<<"e:"<<e[j]<<endl;
             t = t + dt;
             j++;
-        } while (t <= T);
+        } while (t < T);
         All[i] = St;
     }
     return All;
 }
 
-vector<vector<double>> MonteCarlo::genStockPricesForDelta (double S0, double T, double r, double sigma, double dt, int simsize)
+vector<vector<double>> MonteCarlo::genStockPricesForDelta (double S0, double T, double r, double sigma, double dt, double dS, int simsize)
 {
     //double dt = 0.5/simSize;
     double t;
+    int maxsize=184000000;
 //    double a=(r-(1.0/2.0) * sigma * sigma)*dt;
 //    double b=sigma*sqrt(dt);
     double a=dt*r, b=sigma * sqrt(dt);
     shared_ptr<RNG> rng=make_shared<RNG>();
     int tSize=round(T/dt);
-    int rngSize=2*simsize*tSize;
-    vector<double> e = rng->rngUsingBM(rngSize);
+    int rngSize=simsize*tSize + simsize;
+//    cout<<rngSize<<endl;
+    if(rngSize<=maxsize) {
+        vector<double> e = rng->rngUsingBM(rngSize);
 //        cout<<"e size: "<<e.size()<<endl;
 //        rng->writeToFile("SIMRNG",e,simsize,"RNG");
-    double StPlus, StMinus;
-    vector<vector<double>> All;
-    vector<double> AllPlus(simsize);
-    vector<double> AllMinus(simsize);
-    int j = 0;
-    for (int i = 0; i < simsize; i++)
-    {
-        t = 0.0;
-        StPlus=S0;
-        StMinus=S0;
-        do
-        {
-//                cout<<j<<endl;
-//            double val=e[j];
+        double StPlus, StMinus;
+        vector<vector<double>> All;
+        vector<double> AllPlus(simsize);
+        vector<double> AllMinus(simsize);
+        int j = 0;
+        for (int i = 0; i < simsize; i++) {
+            t = 0.0;
+            StPlus = S0 + dS;
+            StMinus = S0 - dS;
+            do {
 //            St=St*exp(a+b*val);
-            double val=e[j];
-            StPlus = StPlus + (StPlus * a) + (b * StPlus * val);
-            if(t<=T-dt)
-            {
+                double val = e[j];
+                StPlus = StPlus + (StPlus * a) + (b * StPlus * val);
                 StMinus = StMinus + (StMinus * a) + (b * StMinus * val);
-            }
-//                cout<<"St:"<<St<<"e:"<<e[j]<<endl;
-            t = t + dt;
-            j++;
-        } while (t <= T+dt);
-        AllPlus[i] = StPlus;
-        AllMinus[i] = StMinus;
+                t = t + dt;
+                j++;
+            } while (t <= T + dt);
+//        cout<<"j: "<<j<<", "<<rngSize<<endl;
+            AllPlus[i] = StPlus;
+            AllMinus[i] = StMinus;
+        }
+        All.push_back(AllPlus);
+        All.push_back(AllMinus);
+        return All;
     }
-//    cout<<"AllPlus[0]: "<<AllPlus[0]<<endl;
-//    cout<<"AllMinus[0]: "<<AllMinus[0]<<endl;
-    All.push_back(AllPlus);
-    All.push_back(AllMinus);
-    return All;
+    else
+    {
+        int loopSize=floor(rngSize/maxsize);
+        vector<int> sizeInfo(loopSize+1);
+        int k=0;
+        for (; k < loopSize-1; ++k)
+        {
+            sizeInfo[k]=maxsize;
+            cout<<sizeInfo[k]<<endl;
+        }
+        sizeInfo[k]=rngSize-(loopSize-1)*maxsize;
+        vector<double> e = rng->rngUsingBM(maxsize);
+        double StPlus, StMinus;
+        vector<vector<double>> All;
+        vector<double> AllPlus(simsize);
+        vector<double> AllMinus(simsize);
+        int j = 0,si=1;
+        for (int i = 0; i < simsize; i++)
+        {
+            t = 0.0;
+            StPlus = S0 + dS;
+            StMinus = S0 - dS;
+            do {
+//            St=St*exp(a+b*val);
+                double val = e[j];
+                StPlus = StPlus + (StPlus * a) + (b * StPlus * val);
+                StMinus = StMinus + (StMinus * a) + (b * StMinus * val);
+                t = t + dt;
+                j++;
+                if(j==maxsize)
+                {
+                    e.clear();
+                    cout<<"sizeinfo: "<<sizeInfo[si]<<endl;
+                    e=rng->rngUsingBM(sizeInfo[si++]);
+                    j=0;
+                }
+            } while (t <= T + dt);
+//        cout<<"j: "<<j<<", "<<rngSize<<endl;
+            AllPlus[i] = StPlus;
+            AllMinus[i] = StMinus;
+        }
+        All.push_back(AllPlus);
+        All.push_back(AllMinus);
+        return All;
+
+    }
 }
 
 vector<double> MonteCarlo::genStockPricesT (double S0, double T, double r, double sigma, double dt, int simsize)
@@ -246,6 +287,27 @@ MonteCarlo::writeToFile (const string fNamePrefix, vector<double> x, vector<doub
     for (int i = 0; i < x.size(); ++i)
     {
         oFileStream<<setw(12)<<x[i]<<setw(12)<<y[i]<<setw(12)<<ci[i]<<endl;
+    }
+    oFileStream.close();
+
+}
+
+
+void MonteCarlo::writeToFile (const string fNamePrefix, vector<double> v, const int k, string colName)
+{
+    ostringstream iterate_label;
+    iterate_label.width(3);
+    iterate_label.fill('0');
+    iterate_label << k;
+    string file_name = fNamePrefix + iterate_label.str() + ".txt";
+    ofstream oFileStream;
+    oFileStream.open(file_name.c_str());
+    assert(oFileStream.is_open());
+    oFileStream<<setw(12)<<colName;
+    oFileStream<<endl;
+    for (int i = 0; i < v.size(); ++i)
+    {
+        oFileStream<<v[i]<<endl;
     }
     oFileStream.close();
 
