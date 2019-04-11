@@ -37,7 +37,7 @@ public:
 
     double payOffForAssetOrNothing(double ST)
     {
-        if(ST>K)
+        if(ST>=K)
         {
             return ST;
         }

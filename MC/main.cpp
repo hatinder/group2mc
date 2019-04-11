@@ -27,10 +27,16 @@ void runWeakEulerConvergenceWithDt();
 void runWeakEulerConvergenceMCError();
 void runRNGUsingStatsBM2();
 void runMCDelta(int sSize);
+void runMCAONDelta(int sSize);
+void runEulerDelta();
+void runEulerAON();
+void runEulerDeltaAON();
+void runEulerDeltaFDM();
+void runEulerDeltaAONFDM();
 
 int main (int argc, char *argv[])
 {
-    int sSize=100;
+    int sSize=1000;
     if(argc==2)
     {
         sSize=atoi(argv[1]);
@@ -38,13 +44,20 @@ int main (int argc, char *argv[])
     }
     initOptionInfo();
     runBlackScholes();
+
 //    runMonteCarloSimulation();
-    runMCDelta(sSize);
-    //    runEuler();
+//    runMCDelta(sSize);
+//        runEuler();
 //    cout<<endl;
+    runAssetOrNothing();
+//    runEulerAON();
+//      runEulerDeltaAON();
+//     runEulerDeltaFDM();
+//    runEulerDelta();
+      runEulerDeltaAONFDM();
 //    runMonteCarloSimulationForAssetOrNothing();
+//    runMCAONDelta(sSize);
 //    runEulerAssetOrNothing();
-//    runAssetOrNothing();
 //    runRNGUsingStatsBM();
 //    clock_t begin=clock();
 //    runRNGUsingStatsBM1(10000000);
@@ -123,6 +136,338 @@ void runEuler()
     euler->writeToFile("EULER",x,y,ci,1);
 }
 
+void runEulerDelta()
+{
+    srand(2019);
+    unique_ptr<Euler> euler;
+    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+    const int dtSize = 6;
+    double dt[dtSize] = {0.5, 0.25, 0.125, 0.0625,0.015625,0.0078125};
+    vector<double> x(dtSize),y(dtSize),ci(dtSize);
+    int simSize = 1000000;
+    double t = 0.0,dS=1.0;
+    double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
+    unique_ptr<BlackScholes> bs;
+    vector<double> values= bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
+                                               optionInfo->getT());
+
+    cout<<"BS: "<<values[0]<<endl;
+     double avgMCPricePlus=0.0,avgMCPriceMinus=0.0;
+    clock_t begin = clock();
+    double MCPlus,MCMinus,avgSigmaHat;
+    vector<double> eulerDelta(dtSize,0.0);
+    for (int l = 0; l < dtSize; ++l) {
+        vector<vector<double>> Sj;
+        double payOffMinus = 0.0, payOffPlus = 0.0;
+        Sj = euler->genStockPricesForDelta(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),
+                                           optionInfo->getSigma(), dt[l], dS, simSize);
+//            double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+//            cout << "Approximate Stock Price at T : " << avgST << endl;
+//            cout<<"Sj[0][0]"<<Sj[0][0]<<endl;
+//            cout<<"Sj[1][0]"<<Sj[1][0]<<endl;
+        for (int j = 0; j < simSize; ++j) {
+            payOffPlus += optionInfo->payOff(Sj[0][j]);
+
+        }
+//            cout<<"Pay Off Plus: "<<payOffPlus<<endl;
+        for (int j = 0; j < simSize; ++j) {
+            payOffMinus += optionInfo->payOff(Sj[1][j]);
+
+        }
+//            cout<<"Pay Off Minus: "<<payOffMinus<<endl;
+        double avgVTPlus = payOffPlus / simSize;
+        double avgVTMinus = payOffMinus / simSize;
+//        cout<<"avgVTPlus: "<<avgVTPlus<<endl;
+//        cout<<"avgVTMinus: "<<avgVTMinus<<endl;
+        MCPlus = D * avgVTPlus;
+        MCMinus = D * avgVTMinus;
+//        cout <<"MCPlus: "<< MCPlus<<endl;
+//        cout <<"MCMinus: "<<MCMinus<<endl;
+        eulerDelta[l] = (MCPlus - MCMinus) / (2.0 * dS);
+
+//            cout<<"avgPricePlus"<<avgMCPricePlus<<endl;
+//            cout<<"avgPriceMinus"<<avgMCPriceMinus<<endl;
+        double sigmaHatSqr = 0.0;
+        for (int k = 0; k < simSize; ++k) {
+            double eulerKDelta=(optionInfo->payOff(Sj[0][k])-optionInfo->payOff(Sj[1][k]))/(2.0*dS);
+            sigmaHatSqr += (eulerDelta[l] - eulerKDelta) * (eulerDelta[l] - eulerKDelta);
+        }
+        avgSigmaHat = sigmaHatSqr / simSize;
+        ci[l] += D * 1.96 * sqrt(avgSigmaHat / simSize);
+        y[l]=values[1]-eulerDelta[l];
+        x[l]=dt[l];
+//        cout<<"y before: "<<y[i]<<endl;
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
+        cout << "MC Delta : " << eulerDelta[l]<< ", y: " << y[l]
+             << " with CI: (+-) " << ci[l] << endl;
+    }
+    euler->writeToFile("EULERDELTA",x,y,ci,1);
+}
+
+void runEulerDeltaFDM()
+{
+    srand(2019);
+    unique_ptr<Euler> euler;
+    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+    double dt = 1.0/365.0;
+    const int dSSize = 3;
+    double dS[dSSize] = {5.0,4.0,3.0};
+    vector<double> x(dSSize),y(dSSize),ci(dSSize);
+    int simSize = 1000000;
+    double t = 0.0;
+    double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
+    unique_ptr<BlackScholes> bs;
+    vector<double> values= bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
+                                               optionInfo->getT());
+
+    cout<<"BS: "<<values[0]<<endl;
+    double avgMCPricePlus=0.0,avgMCPriceMinus=0.0;
+    clock_t begin = clock();
+    double MCPlus,MCMinus,avgSigmaHat;
+    vector<double> eulerDelta(dSSize,0.0);
+    for (int l = 0; l < dSSize; ++l) {
+        vector<vector<double>> Sj;
+        double payOffMinus = 0.0, payOffPlus = 0.0;
+        Sj = euler->genStockPricesForDelta(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),
+                                           optionInfo->getSigma(), dt, dS[l], simSize);
+//            double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+//            cout << "Approximate Stock Price at T : " << avgST << endl;
+//            cout<<"Sj[0][0]"<<Sj[0][0]<<endl;
+//            cout<<"Sj[1][0]"<<Sj[1][0]<<endl;
+        for (int j = 0; j < simSize; ++j) {
+            payOffPlus += optionInfo->payOff(Sj[0][j]);
+
+        }
+//            cout<<"Pay Off Plus: "<<payOffPlus<<endl;
+        for (int j = 0; j < simSize; ++j) {
+            payOffMinus += optionInfo->payOff(Sj[1][j]);
+
+        }
+//            cout<<"Pay Off Minus: "<<payOffMinus<<endl;
+        double avgVTPlus = payOffPlus / simSize;
+        double avgVTMinus = payOffMinus / simSize;
+//        cout<<"avgVTPlus: "<<avgVTPlus<<endl;
+//        cout<<"avgVTMinus: "<<avgVTMinus<<endl;
+        MCPlus = D * avgVTPlus;
+        MCMinus = D * avgVTMinus;
+//        cout <<"MCPlus: "<< MCPlus<<endl;
+//        cout <<"MCMinus: "<<MCMinus<<endl;
+        eulerDelta[l] = (MCPlus - MCMinus) / (2.0 * dS[l]);
+
+//            cout<<"avgPricePlus"<<avgMCPricePlus<<endl;
+//            cout<<"avgPriceMinus"<<avgMCPriceMinus<<endl;
+        double sigmaHatSqr = 0.0;
+        for (int k = 0; k < simSize; ++k) {
+            double eulerKDelta=(optionInfo->payOff(Sj[0][k])-optionInfo->payOff(Sj[1][k]))/(2.0*dS[l]);
+            sigmaHatSqr += (eulerDelta[l] - eulerKDelta) * (eulerDelta[l] - eulerKDelta);
+        }
+        avgSigmaHat = sigmaHatSqr / simSize;
+        ci[l] += D * 1.96 * sqrt(avgSigmaHat / simSize);
+        y[l]=values[1]-eulerDelta[l];
+        x[l]=dS[l];
+//        cout<<"y before: "<<y[i]<<endl;
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
+        cout << "MC Delta : " << eulerDelta[l]<< ", y: " << y[l]
+             << " with CI: (+-) " << ci[l] << endl;
+    }
+    euler->writeToFile("EULERDELTAFDM",x,y,ci,1);
+}
+
+void runEulerDeltaAONFDM()
+{
+    srand(2019);
+    unique_ptr<Euler> euler;
+    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+    double dt = 1.0/365.0;
+    const int dSSize = 3;
+    double dS[dSSize] = {3.0,2.0,1.0};
+    vector<double> x(dSSize),y(dSSize),ci(dSSize);
+    int simSize = 1000000;
+    double t = 0.0;
+    double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
+    unique_ptr<BlackScholes> bs;
+    vector<double> values= bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
+                                               optionInfo->getT());
+
+    cout<<"BS: "<<values[0]<<endl;
+    double avgMCPricePlus=0.0,avgMCPriceMinus=0.0;
+    clock_t begin = clock();
+    double MCPlus,MCMinus,avgSigmaHat;
+    vector<double> eulerDelta(dSSize,0.0);
+    for (int l = 0; l < dSSize; ++l) {
+        vector<vector<double>> Sj;
+        double payOffMinus = 0.0, payOffPlus = 0.0;
+        Sj = euler->genStockPricesForDelta(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),
+                                           optionInfo->getSigma(), dt, dS[l], simSize);
+//            double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+//            cout << "Approximate Stock Price at T : " << avgST << endl;
+//            cout<<"Sj[0][0]"<<Sj[0][0]<<endl;
+//            cout<<"Sj[1][0]"<<Sj[1][0]<<endl;
+        for (int j = 0; j < simSize; ++j) {
+            payOffPlus += optionInfo->payOffForAssetOrNothing(Sj[0][j]);
+
+        }
+//            cout<<"Pay Off Plus: "<<payOffPlus<<endl;
+        for (int j = 0; j < simSize; ++j) {
+            payOffMinus += optionInfo->payOffForAssetOrNothing(Sj[1][j]);
+
+        }
+//            cout<<"Pay Off Minus: "<<payOffMinus<<endl;
+        double avgVTPlus = payOffPlus / simSize;
+        double avgVTMinus = payOffMinus / simSize;
+//        cout<<"avgVTPlus: "<<avgVTPlus<<endl;
+//        cout<<"avgVTMinus: "<<avgVTMinus<<endl;
+        MCPlus = D * avgVTPlus;
+        MCMinus = D * avgVTMinus;
+//        cout <<"MCPlus: "<< MCPlus<<endl;
+//        cout <<"MCMinus: "<<MCMinus<<endl;
+        eulerDelta[l] = (MCPlus - MCMinus) / (2.0 * dS[l]);
+
+//            cout<<"avgPricePlus"<<avgMCPricePlus<<endl;
+//            cout<<"avgPriceMinus"<<avgMCPriceMinus<<endl;
+        double sigmaHatSqr = 0.0;
+        for (int k = 0; k < simSize; ++k) {
+            double eulerKDelta=(optionInfo->payOffForAssetOrNothing(Sj[0][k])-optionInfo->payOffForAssetOrNothing(Sj[1][k]))/(2.0*dS[l]);
+            sigmaHatSqr += (eulerDelta[l] - eulerKDelta) * (eulerDelta[l] - eulerKDelta);
+        }
+        avgSigmaHat = sigmaHatSqr / simSize;
+        ci[l] += D * 1.96 * sqrt(avgSigmaHat / simSize);
+        y[l]=values[1]-eulerDelta[l];
+        x[l]=dS[l];
+//        cout<<"y before: "<<y[i]<<endl;
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
+        cout << "MC Delta : " << eulerDelta[l]<< ", y: " << y[l]
+             << " with CI: (+-) " << ci[l] << endl;
+    }
+    euler->writeToFile("EULERDELTAAONFDM",x,y,ci,1);
+}
+
+void runEulerAON()
+{
+    srand(2019);
+    unique_ptr<Euler> euler;
+    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+    const int dtSize = 6;
+    double dt[dtSize] = {0.5, 0.25, 0.125, 0.0625,0.015625,0.0078125};
+    vector<double> x(dtSize),y(dtSize),ci(dtSize);
+    int simSize = 10000000;
+    double t = 0.0;
+    double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
+    unique_ptr<BlackScholes> bs;
+    vector<double> values= bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
+                                               optionInfo->getT());
+//    ,SjMinusDT(simSize,0.0),SjPlusDT(simSize,0.0);
+//    vector<double> VjMinusDT(simSize,0.0),VjPlusDT(simSize,0.0);
+    int p=0;
+    for (int i = 0; i < dtSize; ++i)
+    {
+        vector<double> Sj(simSize), Vj(simSize);
+        double sigmaHatSqr=0.0;
+        clock_t begin = clock();
+        Sj = euler->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(),
+                                   dt[i], simSize);
+        cout << "SJ Size:" << Sj.size() << endl;
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
+        for (int j = 0; j < Sj.size(); ++j)
+        {
+            Vj[j] = optionInfo->payOffForAssetOrNothing(Sj[j]);
+        }
+//        double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+//        cout << "Approximate Stock Price at T : " << avgST << endl;
+        double avgVT = accumulate(Vj.begin(), Vj.end(), 0.0) / Vj.size();
+        double eulerCallPrice=D * avgVT;
+        for (int k = 0; k < Vj.size(); ++k)
+        {
+            sigmaHatSqr += (avgVT - Vj[k]) * (avgVT - Vj[k]);
+        }
+        double avgSigmaHat =sigmaHatSqr/Vj.size();
+        cout << "Euler Call Price: " << eulerCallPrice  << " with CI: (+-) " << D * 1.96 * sqrt(avgSigmaHat / Vj.size()) << endl;
+        x[i]=dt[i];
+        y[i]=values[0]-eulerCallPrice;
+        ci[i]=D * 1.96 * sqrt(avgSigmaHat / Vj.size());
+    }
+    euler->writeToFile("EULERAON",x,y,ci,1);
+}
+
+void runEulerDeltaAON()
+{
+    srand(2019);
+    unique_ptr<Euler> euler;
+    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+    const int dtSize = 5;
+    double dt[dtSize] = {0.5, 0.25, 0.125, 0.0625,0.015625};
+    vector<double> x(dtSize),y(dtSize),ci(dtSize);
+    int simSize = 10000000;
+    double t = 0.0,dS=1.0;
+    double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
+    unique_ptr<BlackScholes> bs;
+    vector<double> values= bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
+                                               optionInfo->getT());
+
+    cout<<"BS AON CP: "<<values[0]<<endl;
+    cout<<"BS AON DELTA: "<<values[1]<<endl;
+    double avgMCPricePlus=0.0,avgMCPriceMinus=0.0;
+    clock_t begin = clock();
+    double MCPlus,MCMinus,avgSigmaHat;
+    vector<double> eulerDelta(dtSize,0.0);
+    for (int l = 0; l < dtSize; ++l) {
+        vector<vector<double>> Sj;
+        double payOffMinus = 0.0, payOffPlus = 0.0;
+        Sj = euler->genStockPricesForDelta(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),
+                                           optionInfo->getSigma(), dt[l], dS, simSize);
+//            double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+//            cout << "Approximate Stock Price at T : " << avgST << endl;
+//            cout<<"Sj[0][0]"<<Sj[0][0]<<endl;
+//            cout<<"Sj[1][0]"<<Sj[1][0]<<endl;
+        for (int j = 0; j < simSize; ++j) {
+            payOffPlus += optionInfo->payOffForAssetOrNothing(Sj[0][j]);
+
+        }
+//            cout<<"Pay Off Plus: "<<payOffPlus<<endl;
+        for (int j = 0; j < simSize; ++j) {
+            payOffMinus += optionInfo->payOffForAssetOrNothing(Sj[1][j]);
+
+        }
+//            cout<<"Pay Off Minus: "<<payOffMinus<<endl;
+        double avgVTPlus = payOffPlus / simSize;
+        double avgVTMinus = payOffMinus / simSize;
+//        cout<<"avgVTPlus: "<<avgVTPlus<<endl;
+//        cout<<"avgVTMinus: "<<avgVTMinus<<endl;
+        MCPlus = D * avgVTPlus;
+        MCMinus = D * avgVTMinus;
+//        cout <<"MCPlus: "<< MCPlus<<endl;
+//        cout <<"MCMinus: "<<MCMinus<<endl;
+        eulerDelta[l] = (MCPlus - MCMinus) / (2.0 * dS);
+
+//            cout<<"avgPricePlus"<<avgMCPricePlus<<endl;
+//            cout<<"avgPriceMinus"<<avgMCPriceMinus<<endl;
+        double sigmaHatSqr = 0.0;
+        for (int k = 0; k < simSize; ++k) {
+            double eulerKDelta=(optionInfo->payOffForAssetOrNothing(Sj[0][k])-optionInfo->payOffForAssetOrNothing(Sj[1][k]))/(2.0*dS);
+            sigmaHatSqr += (eulerDelta[l] - eulerKDelta) * (eulerDelta[l] - eulerKDelta);
+        }
+        avgSigmaHat = sigmaHatSqr / simSize;
+        ci[l] += D * 1.96 * sqrt(avgSigmaHat / simSize);
+        y[l]=values[1]-eulerDelta[l];
+        x[l]=dt[l];
+//        cout<<"y before: "<<y[i]<<endl;
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
+        cout << "MC Delta : " << eulerDelta[l]<< ", y: " << y[l]
+             << " with CI: (+-) " << ci[l] << endl;
+    }
+    euler->writeToFile("EULERDELTAAON",x,y,ci,1);
+}
+
 void runMonteCarloSimulation()
 {
     srand(2019);
@@ -195,7 +540,7 @@ void runMCDelta(int sSize)
     unique_ptr<MonteCarlo> mc;
     shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     const int NSIM = 4;
-    const int MCSIM = 100;
+    const int MCSIM = 1000;
     int simSize;
     vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
     double dt = 1.0 / 365.0;
@@ -240,12 +585,6 @@ void runMCDelta(int sSize)
             double avgVTMinus = payOffMinus / simSize;
 //            cout<<"avgVTPlus: "<<avgVTPlus<<endl;
 //            cout<<"avgVTMinus: "<<avgVTMinus<<endl;
-            double sigmaHatSqr = 0.0;
-            for (int k = 0; k < simSize; ++k)
-            {
-                sigmaHatSqr += (avgVTPlus - optionInfo->payOff(Sj[0][k])) * (avgVTPlus - optionInfo->payOff(Sj[0][k]));
-            }
-            avgSigmaHat = sigmaHatSqr / Sj.size();
             MCPlus=D*avgVTPlus;
             MCMinus=D*avgVTMinus;
 //            cout << MCPrice<<endl;
@@ -255,6 +594,12 @@ void runMCDelta(int sSize)
             mcError[l]=values[1]-mcDelta[l];
 //            cout<<"avgPricePlus"<<avgMCPricePlus<<endl;
 //            cout<<"avgPriceMinus"<<avgMCPriceMinus<<endl;
+            double sigmaHatSqr = 0.0;
+            for (int k = 0; k < simSize; ++k)
+            {
+                sigmaHatSqr += (avgVTPlus - optionInfo->payOff(Sj[0][k])) * (avgVTPlus - optionInfo->payOff(Sj[0][k]));
+            }
+            avgSigmaHat = sigmaHatSqr / Sj.size();
             ci[i]+=D * 1.96 * sqrt(avgSigmaHat / simSize);
         }
 //        cout<<"y before: "<<y[i]<<endl;
@@ -262,7 +607,13 @@ void runMCDelta(int sSize)
         mc->writeToFile("MCDELTAERR",mcError,i,"ERR");
         x[i]=sqrt(1.0/simSize);
         y[i]=y[i]/MCSIM;
-        ci[i]=ci[i]/MCSIM;
+        double avgMCDelta = accumulate(mcDelta.begin(), mcDelta.end(), 0.0) / mcDelta.size();
+        double tempCI=0.0;
+        for (int m = 0; m < MCSIM; ++m)
+        {
+            tempCI += (avgMCDelta-mcDelta[m])*(avgMCDelta-mcDelta[m]);
+        }
+        ci[i]=D*1.96*tempCI/MCSIM;
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
@@ -322,27 +673,99 @@ void runEulerAssetOrNothing()
     cout << "Euler Asset-or-nothing Call Price: " << exp(-optionInfo->getR()*(optionInfo->getT()-t))*avgVT << endl;
 }
 
+//void runMonteCarloSimulationForAssetOrNothing()
+//{
+//    unique_ptr<MonteCarlo> mc;
+//    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
+//    int size=100;
+//    double dt=1.0/365.0;
+//    double t=0.0;
+//    vector<double> Sj(size,0.0),Vj(size,0.0);
+//    Sj= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,size);
+//    for (int j = 0; j < Sj.size(); ++j)
+//    {
+//        //        cout<<Sj[j]<<endl;
+//        Vj[j]=optionInfo->payOffForAssetOrNothing(Sj[j]);
+//        //      cout<<Vj[j]<<endl;
+//    }
+//
+//    double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+//    cout << "Approximate Stock Price at T : " << avgST << endl;
+//
+//    double avgVT = accumulate( Vj.begin(), Vj.end(), 0.0)/Vj.size();
+//    cout << "MC Asset-or-nothing Call Price: " << exp(-optionInfo->getR()*(optionInfo->getT()-t))*avgVT << endl;
+//}
+
 void runMonteCarloSimulationForAssetOrNothing()
 {
+    srand(2019);
     unique_ptr<MonteCarlo> mc;
-    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
-    int size=100;
-    double dt=1.0/365.0;
-    double t=0.0;
-    vector<double> Sj(size,0.0),Vj(size,0.0);
-    Sj= mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,size);
-    for (int j = 0; j < Sj.size(); ++j)
+    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+    const int NSIM = 5;
+    const int MCSIM=1000;
+    double simSize[NSIM] = {1000,2000,3000,4000,5000};
+    vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
+    double dt = 1.0 / 365.0;
+    double t = 0.0;
+    double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
+    unique_ptr<BlackScholes> bs;
+    vector<double> values = bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(),
+                                                optionInfo->getSigma(), optionInfo->getT());
+    cout<<"BS: "<<values[0]<<endl;
+    for (int i = 0; i < NSIM; ++i)
     {
-        //        cout<<Sj[j]<<endl;
-        Vj[j]=optionInfo->payOffForAssetOrNothing(Sj[j]);
-        //      cout<<Vj[j]<<endl;
+        double avgMCPrice=0.0;
+        clock_t begin = clock();
+        double MCPrice,avgSigmaHat;
+        vector<double> mcPrice(MCSIM,0.0),mcError(MCSIM,0.0);
+        for (int l = 0; l < MCSIM; ++l)
+        {
+            vector<double> Sj(simSize[i], 0.0);
+            double payOff = 0.0;
+            Sj = mc->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(), dt,
+                                    simSize[i]);
+//            double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+//            cout << "Approximate Stock Price at T : " << avgST << endl;
+            for (int j = 0; j < Sj.size(); ++j)
+            {
+                payOff += optionInfo->payOffForAssetOrNothing(Sj[j]);
+
+            }
+            double avgVT = payOff / Sj.size();
+//            cout<<"avgVT: "<<avgVT<<endl;
+//            double sigmaHatSqr = 0.0;
+//            for (int k = 0; k < Sj.size(); ++k)
+//            {
+//                sigmaHatSqr += (avgVT - optionInfo->payOff(Sj[k])) * (avgVT - optionInfo->payOff(Sj[k]));
+//            }
+//            avgSigmaHat = sigmaHatSqr / Sj.size();
+            MCPrice=D*avgVT;
+            mcPrice[l]=MCPrice;
+            mcError[l]=(values[0]-MCPrice);
+//            cout << MCPrice<<endl;
+//            avgMCPrice += MCPrice;
+            y[i]+=(values[0]-MCPrice);
+//            ci[i]+=D * 1.96 * sqrt(avgSigmaHat / Sj.size());
+        }
+        mc->writeToFile("MCAONPRICE",mcPrice,i,"MCP");
+        mc->writeToFile("MCAONERR",mcError,i,"ERR");
+        cout<<"y before: "<<y[i]<<endl;
+        x[i]=sqrt(1.0/simSize[i]);
+        y[i]=y[i]/MCSIM;
+        avgMCPrice = accumulate(mcPrice.begin(), mcPrice.end(), 0.0) / mcPrice.size();
+        double tempCI=0.0;
+        for (int m = 0; m < MCSIM; ++m)
+        {
+            tempCI += (avgMCPrice-mcPrice[m])*(avgMCPrice-mcPrice[m]);
+        }
+        ci[i]=D*1.96*tempCI/MCSIM;
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        cout << "Time Taken for simSize: " << simSize[i] << " is :" << elapsed_secs << endl;
+        cout << "MC Asset or Nothings Call Price: " << avgMCPrice <<", y: "<< y[i] <<" with CI: (+-) " << ci[i] << endl;
+
     }
-
-    double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
-    cout << "Approximate Stock Price at T : " << avgST << endl;
-
-    double avgVT = accumulate( Vj.begin(), Vj.end(), 0.0)/Vj.size();
-    cout << "MC Asset-or-nothing Call Price: " << exp(-optionInfo->getR()*(optionInfo->getT()-t))*avgVT << endl;
+    mc->writeToFile("MCERROR",x,y,ci,1);
 }
 
 void runAssetOrNothing()
@@ -355,6 +778,94 @@ void runAssetOrNothing()
     cout<<"Asset-or-nothing Delta: "<<AssetOrNothingValues[1]<<endl;
 }
 
+void runMCAONDelta(int sSize)
+{
+    srand(2019);
+    unique_ptr<MonteCarlo> mc;
+    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+    const int NSIM = 4;
+    const int MCSIM = 1000;
+    int simSize;
+    vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
+    double dt = 1.0 / 365.0;
+    double dS=1.0;
+    double t = 0.0;
+    double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
+    unique_ptr<BlackScholes> bs;
+    vector<double> values = bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(),
+                                                optionInfo->getSigma(), optionInfo->getT());
+    cout<<"BS: "<<values[0]<<endl;
+    for (int i = 0; i < NSIM; ++i)
+    {
+        simSize=(i+1)*sSize;
+        double avgMCPricePlus=0.0,avgMCPriceMinus=0.0;
+        clock_t begin = clock();
+        double MCPlus,MCMinus,avgSigmaHat;
+        vector<double> mcDelta(MCSIM,0.0),mcError(MCSIM,0.0);
+        for (int l = 0; l < MCSIM; ++l)
+        {
+            vector<vector<double>> Sj;
+            double payOffMinus = 0.0,payOffPlus=0.0;
+            Sj = mc->genStockPricesForDelta(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(),
+                                            optionInfo->getSigma(), dt, dS,
+                                            simSize);
+//            double avgST = accumulate( Sj.begin(), Sj.end(), 0.0)/Sj.size();
+//            cout << "Approximate Stock Price at T : " << avgST << endl;
+//            cout<<"Sj[0][0]"<<Sj[0][0]<<endl;
+//            cout<<"Sj[1][0]"<<Sj[1][0]<<endl;
+            for (int j = 0; j < simSize; ++j)
+            {
+                payOffPlus += optionInfo->payOffForAssetOrNothing(Sj[0][j]);
+
+            }
+//            cout<<"Pay Off Plus: "<<payOffPlus<<endl;
+            for (int j = 0; j < simSize; ++j)
+            {
+                payOffMinus += optionInfo->payOffForAssetOrNothing(Sj[1][j]);
+
+            }
+//            cout<<"Pay Off Minus: "<<payOffMinus<<endl;
+            double avgVTPlus = payOffPlus / simSize;
+            double avgVTMinus = payOffMinus / simSize;
+//            cout<<"avgVTPlus: "<<avgVTPlus<<endl;
+//            cout<<"avgVTMinus: "<<avgVTMinus<<endl;
+            MCPlus=D*avgVTPlus;
+            MCMinus=D*avgVTMinus;
+//            cout << MCPrice<<endl;
+            avgMCPricePlus += MCPlus;
+            avgMCPriceMinus += MCMinus;
+            mcDelta[l]=(MCPlus-MCMinus)/(2*dS);
+            mcError[l]=values[1]-mcDelta[l];
+//            cout<<"avgPricePlus"<<avgMCPricePlus<<endl;
+//            cout<<"avgPriceMinus"<<avgMCPriceMinus<<endl;
+            double sigmaHatSqr = 0.0;
+            for (int k = 0; k < simSize; ++k)
+            {
+                sigmaHatSqr += (avgVTPlus - optionInfo->payOff(Sj[0][k])) * (avgVTPlus - optionInfo->payOff(Sj[0][k]));
+            }
+            avgSigmaHat = sigmaHatSqr / Sj.size();
+            ci[i]+=D * 1.96 * sqrt(avgSigmaHat / simSize);
+        }
+//        cout<<"y before: "<<y[i]<<endl;
+        mc->writeToFile("MCAONDELTA",mcDelta,i,"MCP");
+        mc->writeToFile("MCAONDELTAERR",mcError,i,"ERR");
+        x[i]=sqrt(1.0/simSize);
+        y[i]=y[i]/MCSIM;
+        double avgMCDelta = accumulate(mcDelta.begin(), mcDelta.end(), 0.0) / mcDelta.size();
+        double tempCI=0.0;
+        for (int m = 0; m < MCSIM; ++m)
+        {
+            tempCI += (avgMCDelta-mcDelta[m])*(avgMCDelta-mcDelta[m]);
+        }
+        ci[i]=D*1.96*tempCI/MCSIM;
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
+        cout << "MC Delta : " << (avgMCPricePlus-avgMCPriceMinus)/(MCSIM*2*dS) <<", y: "<< y[i] <<" with CI: (+-) " << ci[i] << endl;
+
+    }
+    mc->writeToFile("MCERROR",x,y,ci,1);
+}
 
 void runRNGUsingStatsBM()
 {

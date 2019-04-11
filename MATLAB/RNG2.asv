@@ -10,4 +10,4 @@ disp(length(D2E.data(:,1))-length(unique(D2E.data(:,1))));
 grid on;
 xlabel("Mean")
 ylabel("Density")
-title('10^3 Random Numbers Using Box-Muller')
+title('10^6 Random Numbers Using Box-Muller')

@@ -13,6 +13,8 @@ class Euler
 {
 public:
     vector<double> genStockPrices(double S0, double T, double r, double sigma, double dt, int simSize);
+    vector<vector<double>>
+    genStockPricesForDelta(double S0, double T, double r, double sigma, double dt, double dS, int simSize);
     double getStockPrice(const double S0, const double T, const double r, const double sigma, const double dt);
     double getStockPrice2(const double S0, const double T, const double r, const double sigma, const double dt);
     void writeToFile (const string fNamePrefix, unique_ptr<double[]> v, const int size, const int k);
