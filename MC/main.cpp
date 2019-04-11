@@ -855,7 +855,7 @@ void runMonteCarloSimulationForAssetOrNothing (shared_ptr<OptionInfo> optionInfo
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize[i] << " is :" << elapsed_secs << endl;
-        cout << "MC Asset or Nothings Call Price: " << avgMCPrice <<", y: "<< simSize[i] <<" with CI: (+-) " << ci[i] << endl;
+        cout << "MC Asset or Nothings Call Price: " << avgMCPrice <<", simSize: "<< simSize[i] <<" with CI: (+-) " << ci[i] << endl;
 
     }
     mc->writeToFile("MCERROR",x,y,ci,1);
