@@ -6,17 +6,18 @@
 #include "EulerMethod.hpp"
 #include "BlackScholes.hpp"
 #include <iomanip>
+#include <fstream>
 
 
 random_device rdStats;
 
 void initOptionInfo();
-void runMonteCarloSimulation();
+void runMonteCarloSimulation (shared_ptr<OptionInfo> optionInfo, int MCSIM);
 void runRNG (int size);
-void runEuler();
+void runEuler (shared_ptr<OptionInfo> optionInfo, int simSize);
 void runBlackScholes();
 void runEulerAssetOrNothing();
-void runMonteCarloSimulationForAssetOrNothing();
+void runMonteCarloSimulationForAssetOrNothing (shared_ptr<OptionInfo> optionInfo, int MCSIM);
 void runAssetOrNothing();
 void runRNGUsingStatsBM();
 void runRNGUsingStatsBM1 (int size);
@@ -26,35 +27,41 @@ void runMCUsingStatsBM();
 void runWeakEulerConvergenceWithDt();
 void runWeakEulerConvergenceMCError();
 void runRNGUsingStatsBM2();
-void runMCDelta(int sSize);
-void runMCAONDelta(int sSize);
-void runEulerDelta();
-void runEulerAON();
-void runEulerDeltaAON();
-void runEulerDeltaFDM();
-void runEulerDeltaAONFDM();
+void runMCDelta (shared_ptr<OptionInfo> optionInfo, int sSize);
+void runMCAONDelta (shared_ptr<OptionInfo> optionInfo, int MCSIM);
+void runEulerDelta (shared_ptr<OptionInfo> optionInfo, int simSize);
+void runEulerAON (shared_ptr<OptionInfo> optionInfo, int simSize);
+void runEulerDeltaAON (shared_ptr<OptionInfo> optionInfo, int simSize);
+void runEulerDeltaFDM (shared_ptr<OptionInfo> optionInfo, int simSize);
+void runEulerDeltaAONFDM (shared_ptr<OptionInfo> optionInfo, int simSize);
+bool run();
 
 int main (int argc, char *argv[])
 {
-    int sSize=1000;
-    if(argc==2)
-    {
-        sSize=atoi(argv[1]);
-        cout<<"Starting with simSize: "<<sSize<<endl;
-    }
-    initOptionInfo();
-    runBlackScholes();
+    bool val=run();
+    if(val)
+        cout<<"Completed Successfully";
+    else
+        cout<<"Run time problem. Please check";
+//    int sSize=1000;
+//    if(argc==2)
+//    {
+//        sSize=atoi(argv[1]);
+//        cout<<"Starting with simSize: "<<sSize<<endl;
+//    }
+//    initOptionInfo();
+//    runBlackScholes();
 
 //    runMonteCarloSimulation();
 //    runMCDelta(sSize);
 //        runEuler();
 //    cout<<endl;
-    runAssetOrNothing();
+//    runAssetOrNothing();
 //    runEulerAON();
 //      runEulerDeltaAON();
 //     runEulerDeltaFDM();
 //    runEulerDelta();
-      runEulerDeltaAONFDM();
+//      runEulerDeltaAONFDM();
 //    runMonteCarloSimulationForAssetOrNothing();
 //    runMCAONDelta(sSize);
 //    runEulerAssetOrNothing();
@@ -78,6 +85,92 @@ int main (int argc, char *argv[])
     return 0;
 }
 
+bool run()
+{
+    ifstream ifs;
+    string filename="config.txt";
+    ifs.open(filename.c_str(), ios_base::in);
+    if (!ifs)
+    {
+        cout << "config.txt file is missing: " << filename << endl;
+        return false;
+    }
+    vector<double> parameterValues;
+    vector<string> parameterNames ;
+    double value;
+    string name;
+//    ifs >> name;
+//    cout << name<<endl;
+    while (ifs >> name >> value)
+    {
+        parameterNames.push_back(name);
+        parameterValues.push_back(value);
+    }
+//    cout<<"config file parameters"<<endl;
+//    for (int i = 0; i < parameterValues.size(); ++i)
+//    {
+//        cout<<"Name: "<<parameterNames[i]<<" , Value: "<<parameterValues[i]<<endl;
+//    }
+    ifs.close();
+    shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>(parameterValues[0], parameterValues[1], parameterValues[2], parameterValues[3], parameterValues[4]);
+    cout<<  optionInfo<<endl;
+    int sampleSize=parameterValues[5];
+    int simSize=parameterValues[6];
+    cout<<"Sample Size: "<<sampleSize<<", Simulation Size: "<<simSize<<endl;
+
+    cout<<"=========== "<< endl;
+    cout<<"1.Running European Call for Monte Carlo Error with Sample Size: "<<sampleSize<< endl;
+    cout<<"=========== "<< endl;
+    runMonteCarloSimulation(optionInfo,sampleSize);
+
+    cout<<"=========== "<< endl;
+    cout<<"2.Running European Call for Euler Error with simulation Size: "<<simSize<< endl;
+    cout<<"=========== "<< endl;
+    runEuler(optionInfo,simSize);
+
+    cout<<"=========== "<< endl;
+    cout<<"3.Running European Call Delta for Monte Carlo Error with Sample Size: "<<sampleSize<< endl;
+    cout<<"=========== "<< endl;
+    runMCDelta(optionInfo,sampleSize);
+
+    cout<<"=========== "<< endl;
+    cout<<"4.Running European Call Delta for Euler Error with simulation Size: "<<simSize<< endl;
+    cout<<"=========== "<< endl;
+    runEulerDelta(optionInfo,simSize);
+
+    cout<<"=========== "<< endl;
+    cout<<"5.Running European Call Delta for Finite Difference Method (dS) error with simulation Size: "<<simSize<< endl;
+    cout<<"=========== "<< endl;
+    runEulerDeltaFDM(optionInfo,simSize);
+
+    cout<<"=========== "<< endl;
+    cout<<"6.Running Asset-Or-Nothing Call Monte Carlo Error sample size: "<<sampleSize<< endl;
+    cout<<"=========== "<< endl;
+    runMonteCarloSimulationForAssetOrNothing (optionInfo,sampleSize);
+
+    cout<<"=========== "<< endl;
+    cout<<"7.Running Asset-Or-Nothing Call Euler Error with simulation Size: "<<simSize<< endl;
+    cout<<"=========== "<< endl;
+    runEulerAON(optionInfo,simSize);
+
+    cout<<"=========== "<< endl;
+    cout<<"8.Running Asset-Or-Nothing Call Delta Monte Carlo Error with Sample Size: "<<sampleSize<< endl;
+    cout<<"=========== "<< endl;
+    runMCAONDelta(optionInfo,sampleSize);
+
+    cout<<"=========== "<< endl;
+    cout<<"9.Running Asset-Or-Nothing Call Delta Euler Error with simulation Size: "<<simSize<< endl;
+    cout<<"=========== "<< endl;
+    runEulerDeltaAON(optionInfo,simSize);
+
+    cout<<"=========== "<< endl;
+    cout<<"10.Running Asset-Or-Nothing Call Delta for Finite Difference Method (dS) error with simulation Size: "<<simSize<< endl;
+    cout<<"=========== "<< endl;
+    runEulerDeltaAONFDM(optionInfo,simSize);
+
+    return true;
+}
+
 void initOptionInfo()
 {
     shared_ptr<OptionInfo> optionInfo=make_shared<OptionInfo>();
@@ -87,15 +180,15 @@ void initOptionInfo()
 
 }
 
-void runEuler()
+void runEuler (shared_ptr<OptionInfo> optionInfo, int simSize)
 {
     srand(2019);
     unique_ptr<Euler> euler;
-    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+//    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     const int dtSize = 6;
     double dt[dtSize] = {0.5, 0.25, 0.125, 0.0625,0.015625,0.0078125};
     vector<double> x(dtSize),y(dtSize),ci(dtSize);
-    int simSize = 10000000;
+//    int simSize = 10000000;
     double t = 0.0;
     double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
     unique_ptr<BlackScholes> bs;
@@ -111,7 +204,7 @@ void runEuler()
         clock_t begin = clock();
         Sj = euler->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(),
                                    dt[i], simSize);
-        cout << "SJ Size:" << Sj.size() << endl;
+//        cout << "SJ Size:" << Sj.size() << endl;
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
@@ -128,7 +221,7 @@ void runEuler()
             sigmaHatSqr += (avgVT - Vj[k]) * (avgVT - Vj[k]);
         }
         double avgSigmaHat =sigmaHatSqr/Vj.size();
-        cout << "Euler Call Price: " << eulerCallPrice  << " with CI: (+-) " << D * 1.96 * sqrt(avgSigmaHat / Vj.size()) << endl;
+        cout << "Euler Call Price: " << eulerCallPrice  << " with CI: (+-) " << D * 1.96 * sqrt(avgSigmaHat / Vj.size()) << ", dt: " <<dt[i]<<endl;
         x[i]=dt[i];
         y[i]=values[0]-eulerCallPrice;
         ci[i]=D * 1.96 * sqrt(avgSigmaHat / Vj.size());
@@ -136,22 +229,22 @@ void runEuler()
     euler->writeToFile("EULER",x,y,ci,1);
 }
 
-void runEulerDelta()
+void runEulerDelta (shared_ptr<OptionInfo> optionInfo, int simSize)
 {
     srand(2019);
     unique_ptr<Euler> euler;
-    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+//    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     const int dtSize = 6;
     double dt[dtSize] = {0.5, 0.25, 0.125, 0.0625,0.015625,0.0078125};
     vector<double> x(dtSize),y(dtSize),ci(dtSize);
-    int simSize = 1000000;
+//    int simSize = 1000000;
     double t = 0.0,dS=1.0;
     double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
     unique_ptr<BlackScholes> bs;
     vector<double> values= bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
                                                optionInfo->getT());
 
-    cout<<"BS: "<<values[0]<<endl;
+//    cout<<"BS: "<<values[0]<<endl;
      double avgMCPricePlus=0.0,avgMCPriceMinus=0.0;
     clock_t begin = clock();
     double MCPlus,MCMinus,avgSigmaHat;
@@ -200,29 +293,28 @@ void runEulerDelta()
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
-        cout << "MC Delta : " << eulerDelta[l]<< ", y: " << y[l]
-             << " with CI: (+-) " << ci[l] << endl;
+        cout << "MC Delta : " << eulerDelta[l]<< " with CI: (+-) " << ci[l] << endl;
     }
     euler->writeToFile("EULERDELTA",x,y,ci,1);
 }
 
-void runEulerDeltaFDM()
+void runEulerDeltaFDM (shared_ptr<OptionInfo> optionInfo, int simSize)
 {
     srand(2019);
     unique_ptr<Euler> euler;
-    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+//    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     double dt = 1.0/365.0;
     const int dSSize = 3;
     double dS[dSSize] = {5.0,4.0,3.0};
     vector<double> x(dSSize),y(dSSize),ci(dSSize);
-    int simSize = 1000000;
+//    int simSize = 1000000;
     double t = 0.0;
     double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
     unique_ptr<BlackScholes> bs;
     vector<double> values= bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
                                                optionInfo->getT());
 
-    cout<<"BS: "<<values[0]<<endl;
+//    cout<<"BS: "<<values[0]<<endl;
     double avgMCPricePlus=0.0,avgMCPriceMinus=0.0;
     clock_t begin = clock();
     double MCPlus,MCMinus,avgSigmaHat;
@@ -271,29 +363,29 @@ void runEulerDeltaFDM()
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
-        cout << "MC Delta : " << eulerDelta[l]<< ", y: " << y[l]
+        cout << "MC Delta : " << eulerDelta[l]<< ", dS: " << dS[l]
              << " with CI: (+-) " << ci[l] << endl;
     }
     euler->writeToFile("EULERDELTAFDM",x,y,ci,1);
 }
 
-void runEulerDeltaAONFDM()
+void runEulerDeltaAONFDM (shared_ptr<OptionInfo> optionInfo, int simSize)
 {
     srand(2019);
     unique_ptr<Euler> euler;
-    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+//    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     double dt = 1.0/365.0;
     const int dSSize = 3;
     double dS[dSSize] = {3.0,2.0,1.0};
     vector<double> x(dSSize),y(dSSize),ci(dSSize);
-    int simSize = 1000000;
+//    int simSize = 1000000;
     double t = 0.0;
     double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
     unique_ptr<BlackScholes> bs;
     vector<double> values= bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
                                                optionInfo->getT());
 
-    cout<<"BS: "<<values[0]<<endl;
+//    cout<<"BS: "<<values[0]<<endl;
     double avgMCPricePlus=0.0,avgMCPriceMinus=0.0;
     clock_t begin = clock();
     double MCPlus,MCMinus,avgSigmaHat;
@@ -342,21 +434,21 @@ void runEulerDeltaAONFDM()
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
-        cout << "MC Delta : " << eulerDelta[l]<< ", y: " << y[l]
+        cout << "MC Delta : " << eulerDelta[l]<< ", dS: " << dS[l]
              << " with CI: (+-) " << ci[l] << endl;
     }
     euler->writeToFile("EULERDELTAAONFDM",x,y,ci,1);
 }
 
-void runEulerAON()
+void runEulerAON (shared_ptr<OptionInfo> optionInfo, int simSize)
 {
     srand(2019);
     unique_ptr<Euler> euler;
-    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+//    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     const int dtSize = 6;
     double dt[dtSize] = {0.5, 0.25, 0.125, 0.0625,0.015625,0.0078125};
     vector<double> x(dtSize),y(dtSize),ci(dtSize);
-    int simSize = 10000000;
+//    int simSize = 10000000;
     double t = 0.0;
     double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
     unique_ptr<BlackScholes> bs;
@@ -372,7 +464,7 @@ void runEulerAON()
         clock_t begin = clock();
         Sj = euler->genStockPrices(optionInfo->getS0(), optionInfo->getT(), optionInfo->getR(), optionInfo->getSigma(),
                                    dt[i], simSize);
-        cout << "SJ Size:" << Sj.size() << endl;
+//        cout << "SJ Size:" << Sj.size() << endl;
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
@@ -389,7 +481,7 @@ void runEulerAON()
             sigmaHatSqr += (avgVT - Vj[k]) * (avgVT - Vj[k]);
         }
         double avgSigmaHat =sigmaHatSqr/Vj.size();
-        cout << "Euler Call Price: " << eulerCallPrice  << " with CI: (+-) " << D * 1.96 * sqrt(avgSigmaHat / Vj.size()) << endl;
+        cout << "Euler Call Price: " << eulerCallPrice  << " with CI: (+-) " << D * 1.96 * sqrt(avgSigmaHat / Vj.size()) << " for dt: "<<dt[i]<< endl;
         x[i]=dt[i];
         y[i]=values[0]-eulerCallPrice;
         ci[i]=D * 1.96 * sqrt(avgSigmaHat / Vj.size());
@@ -397,23 +489,23 @@ void runEulerAON()
     euler->writeToFile("EULERAON",x,y,ci,1);
 }
 
-void runEulerDeltaAON()
+void runEulerDeltaAON (shared_ptr<OptionInfo> optionInfo, int simSize)
 {
     srand(2019);
     unique_ptr<Euler> euler;
-    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+//    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     const int dtSize = 5;
     double dt[dtSize] = {0.5, 0.25, 0.125, 0.0625,0.015625};
     vector<double> x(dtSize),y(dtSize),ci(dtSize);
-    int simSize = 10000000;
+//    int simSize = 10000000;
     double t = 0.0,dS=1.0;
     double D = exp(-optionInfo->getR() * (optionInfo->getT() - t));
     unique_ptr<BlackScholes> bs;
     vector<double> values= bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(), optionInfo->getSigma(),
                                                optionInfo->getT());
 
-    cout<<"BS AON CP: "<<values[0]<<endl;
-    cout<<"BS AON DELTA: "<<values[1]<<endl;
+//    cout<<"BS AON CP: "<<values[0]<<endl;
+//    cout<<"BS AON DELTA: "<<values[1]<<endl;
     double avgMCPricePlus=0.0,avgMCPriceMinus=0.0;
     clock_t begin = clock();
     double MCPlus,MCMinus,avgSigmaHat;
@@ -462,20 +554,20 @@ void runEulerDeltaAON()
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
-        cout << "MC Delta : " << eulerDelta[l]<< ", y: " << y[l]
+        cout << "MC Delta : " << eulerDelta[l]<< ", simSize: " << simSize
              << " with CI: (+-) " << ci[l] << endl;
     }
     euler->writeToFile("EULERDELTAAON",x,y,ci,1);
 }
 
-void runMonteCarloSimulation()
+void runMonteCarloSimulation (shared_ptr<OptionInfo> optionInfo, int MCSIM)
 {
     srand(2019);
     unique_ptr<MonteCarlo> mc;
-    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+//    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     const int NSIM = 5;
-    const int MCSIM=1000;
-    double simSize[NSIM] = {1000,2000,3000,4000,500};
+//    const int MCSIM=1000;
+    double simSize[NSIM] = {100,200,300,400,500};
     vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
     double dt = 1.0 / 365.0;
     double t = 0.0;
@@ -520,27 +612,28 @@ void runMonteCarloSimulation()
         }
         mc->writeToFile("MCPRICE",mcPrice,i,"MCP");
         mc->writeToFile("MCERR",mcError,i,"ERR");
-        cout<<"y before: "<<y[i]<<endl;
+//        cout<<"y before: "<<y[i]<<endl;
         x[i]=sqrt(1.0/simSize[i]);
         y[i]=y[i]/MCSIM;
         ci[i]=ci[i]/MCSIM;
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize[i] << " is :" << elapsed_secs << endl;
-        cout << "MC Call Price: " << avgMCPrice/MCSIM <<", y: "<< y[i] <<" with CI: (+-) " << ci[i] << endl;
+        cout << "MC Call Price: " << avgMCPrice/MCSIM <<", simSize: "<< simSize[i] <<" with CI: (+-) " << ci[i] << endl;
 
     }
     mc->writeToFile("MCERROR",x,y,ci,1);
 }
 
 
-void runMCDelta(int sSize)
+void runMCDelta (shared_ptr<OptionInfo> optionInfo, int MCSIM)
 {
     srand(2019);
     unique_ptr<MonteCarlo> mc;
-    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+//    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     const int NSIM = 4;
-    const int MCSIM = 1000;
+//    const int MCSIM = 1000;
+    int sSize=100;
     int simSize;
     vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
     double dt = 1.0 / 365.0;
@@ -550,7 +643,7 @@ void runMCDelta(int sSize)
     unique_ptr<BlackScholes> bs;
     vector<double> values = bs->calcExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(),
                                                 optionInfo->getSigma(), optionInfo->getT());
-    cout<<"BS: "<<values[0]<<endl;
+//    cout<<"BS: "<<values[0]<<endl;
     for (int i = 0; i < NSIM; ++i)
     {
         simSize=(i+1)*sSize;
@@ -617,7 +710,7 @@ void runMCDelta(int sSize)
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
-        cout << "MC Delta : " << (avgMCPricePlus-avgMCPriceMinus)/(MCSIM*2*dS) <<", y: "<< y[i] <<" with CI: (+-) " << ci[i] << endl;
+        cout << "MC Delta : " << (avgMCPricePlus-avgMCPriceMinus)/(MCSIM*2*dS) <<", simSize: "<< simSize <<" with CI: (+-) " << ci[i] << endl;
 
     }
     mc->writeToFile("MCERROR",x,y,ci,1);
@@ -696,14 +789,14 @@ void runEulerAssetOrNothing()
 //    cout << "MC Asset-or-nothing Call Price: " << exp(-optionInfo->getR()*(optionInfo->getT()-t))*avgVT << endl;
 //}
 
-void runMonteCarloSimulationForAssetOrNothing()
+void runMonteCarloSimulationForAssetOrNothing (shared_ptr<OptionInfo> optionInfo, int MCSIM)
 {
     srand(2019);
     unique_ptr<MonteCarlo> mc;
-    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+//    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
     const int NSIM = 5;
-    const int MCSIM=1000;
-    double simSize[NSIM] = {1000,2000,3000,4000,5000};
+//    const int MCSIM=1000;
+    double simSize[NSIM] = {100,200,300,400,500};
     vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
     double dt = 1.0 / 365.0;
     double t = 0.0;
@@ -711,7 +804,7 @@ void runMonteCarloSimulationForAssetOrNothing()
     unique_ptr<BlackScholes> bs;
     vector<double> values = bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(),
                                                 optionInfo->getSigma(), optionInfo->getT());
-    cout<<"BS: "<<values[0]<<endl;
+//    cout<<"BS: "<<values[0]<<endl;
     for (int i = 0; i < NSIM; ++i)
     {
         double avgMCPrice=0.0;
@@ -749,7 +842,7 @@ void runMonteCarloSimulationForAssetOrNothing()
         }
         mc->writeToFile("MCAONPRICE",mcPrice,i,"MCP");
         mc->writeToFile("MCAONERR",mcError,i,"ERR");
-        cout<<"y before: "<<y[i]<<endl;
+//        cout<<"y before: "<<y[i]<<endl;
         x[i]=sqrt(1.0/simSize[i]);
         y[i]=y[i]/MCSIM;
         avgMCPrice = accumulate(mcPrice.begin(), mcPrice.end(), 0.0) / mcPrice.size();
@@ -762,7 +855,7 @@ void runMonteCarloSimulationForAssetOrNothing()
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize[i] << " is :" << elapsed_secs << endl;
-        cout << "MC Asset or Nothings Call Price: " << avgMCPrice <<", y: "<< y[i] <<" with CI: (+-) " << ci[i] << endl;
+        cout << "MC Asset or Nothings Call Price: " << avgMCPrice <<", y: "<< simSize[i] <<" with CI: (+-) " << ci[i] << endl;
 
     }
     mc->writeToFile("MCERROR",x,y,ci,1);
@@ -778,13 +871,15 @@ void runAssetOrNothing()
     cout<<"Asset-or-nothing Delta: "<<AssetOrNothingValues[1]<<endl;
 }
 
-void runMCAONDelta(int sSize)
+void runMCAONDelta (shared_ptr<OptionInfo> optionInfo, int MCSIM)
 {
     srand(2019);
     unique_ptr<MonteCarlo> mc;
-    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+//    shared_ptr<OptionInfo> optionInfo = make_shared<OptionInfo>();
+
     const int NSIM = 4;
-    const int MCSIM = 1000;
+//    const int MCSIM = 1000;
+    int sSize=100;
     int simSize;
     vector<double> x(NSIM,0.0),y(NSIM,0.0),ci(NSIM,0.0);
     double dt = 1.0 / 365.0;
@@ -794,7 +889,7 @@ void runMCAONDelta(int sSize)
     unique_ptr<BlackScholes> bs;
     vector<double> values = bs->calcAssetOrNothingExactValues(optionInfo->getS0(), optionInfo->getK(), optionInfo->getR(),
                                                 optionInfo->getSigma(), optionInfo->getT());
-    cout<<"BS: "<<values[0]<<endl;
+//    cout<<"BS: "<<values[0]<<endl;
     for (int i = 0; i < NSIM; ++i)
     {
         simSize=(i+1)*sSize;
@@ -861,7 +956,7 @@ void runMCAONDelta(int sSize)
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         cout << "Time Taken for simSize: " << simSize << " is :" << elapsed_secs << endl;
-        cout << "MC Delta : " << (avgMCPricePlus-avgMCPriceMinus)/(MCSIM*2*dS) <<", y: "<< y[i] <<" with CI: (+-) " << ci[i] << endl;
+        cout << "MC Delta : " << (avgMCPricePlus-avgMCPriceMinus)/(MCSIM*2*dS) <<", simSize: "<< simSize <<" with CI: (+-) " << ci[i] << endl;
 
     }
     mc->writeToFile("MCERROR",x,y,ci,1);

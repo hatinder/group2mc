@@ -1,0 +1,7 @@
+S0 70.0
+K 65.0
+T 0.5
+r 0.07
+sigma 0.27
+samplesize 100
+simulationsize 1000
